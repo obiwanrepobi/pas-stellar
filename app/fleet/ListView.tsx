@@ -38,7 +38,7 @@ export default function ListView({ boats, onBoatClick }: Props) {
     <div>
       {/* Filter + Search bar */}
       <div className="flex items-center justify-between mb-4 gap-4">
-        <div className="flex bg-white border border-gray-200 rounded-xl p-1 gap-0.5 shadow-sm">
+        <div className="flex bg-[#efefef] rounded-full p-1 gap-0.5">
           {filters.map((f) => {
             const count =
               f.value === "all"
@@ -48,16 +48,16 @@ export default function ListView({ boats, onBoatClick }: Props) {
               <button
                 key={f.value}
                 onClick={() => setActiveFilter(f.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
                   activeFilter === f.value
-                    ? "bg-[#081731] text-white shadow-sm"
-                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                    ? "bg-black text-white shadow-[rgba(0,0,0,0.12)_0px_2px_8px]"
+                    : "text-[#4b4b4b] hover:text-black"
                 }`}
               >
                 {f.label}
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    activeFilter === f.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                    activeFilter === f.value ? "bg-white/20 text-white" : "bg-white/80 text-[#4b4b4b]"
                   }`}
                 >
                   {count}
@@ -77,7 +77,7 @@ export default function ListView({ boats, onBoatClick }: Props) {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">

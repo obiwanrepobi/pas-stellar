@@ -47,25 +47,26 @@ export default function MapView({ onBoatClick }: Props) {
     <div className="relative" ref={mapRef}>
       {/* Map container */}
       <div
-        className="rounded-2xl overflow-hidden border border-[#B5D4E8] shadow-sm"
-        style={{ background: "linear-gradient(180deg, #e8f0e4 0%, #e8f0e4 48px, #c8e6f5 48px)" }}
+        className="rounded-2xl overflow-hidden shadow-[rgba(0,0,0,0.08)_0px_4px_16px] border border-black/5"
+        style={{ background: "linear-gradient(180deg, #e4edd8 0%, #e4edd8 48px, #c8e6f5 48px)" }}
       >
         {/* Shore strip */}
-        <div className="h-12 flex items-center px-6 border-b border-[#B5D4E8]/60"
-          style={{ background: "linear-gradient(180deg, #d4e8cc 0%, #e8f0e4 100%)" }}>
-          <span className="text-[#2A5B7D] text-xs font-semibold tracking-wider uppercase">
-            🌲 Shore — Lake Wallenpaupack
+        <div className="h-12 flex items-center justify-between px-6 border-b border-black/5"
+          style={{ background: "linear-gradient(180deg, #d0e0c4 0%, #e4edd8 100%)" }}>
+          <span className="text-[#2A5B7D] text-xs font-semibold tracking-widest uppercase">
+            Shore — Lake Wallenpaupack
           </span>
+          <span className="text-[#2A5B7D]/50 text-xs">Dock A &amp; B Interactive · C–E Seasonal Storage</span>
         </div>
 
         {/* Docks row */}
         <div className="flex gap-8 px-8 py-6 items-start">
 
           {/* Gas Dock (decorative) */}
-          <div className="flex flex-col items-center gap-1 opacity-40">
-            <span className="text-[#081731] text-[10px] font-semibold mb-1 tracking-wide uppercase">Gas Dock</span>
-            <div style={{ width: 40, height: (DOCK_A_ROWS * (CELL_H + ROW_GAP)) }} className="rounded-lg bg-[#5C9A9E]/30 border-2 border-[#5C9A9E]/40 flex items-center justify-center">
-              ⛽
+          <div className="flex flex-col items-center gap-1 opacity-35">
+            <span className="text-[#081731] text-[10px] font-semibold mb-1 tracking-widest uppercase">Gas</span>
+            <div style={{ width: 40, height: (DOCK_A_ROWS * (CELL_H + ROW_GAP)) }} className="rounded-lg bg-[#5C9A9E]/25 border border-[#5C9A9E]/30 flex items-end justify-center pb-2">
+              <span className="text-[#2A5B7D] text-[9px] font-bold tracking-wider">GAS</span>
             </div>
           </div>
 
@@ -95,9 +96,9 @@ export default function MapView({ onBoatClick }: Props) {
 
           {/* Docks C–E (decorative) */}
           {["C", "D", "E"].map((label) => (
-            <div key={label} className="flex flex-col items-center gap-1 opacity-25">
-              <span className="text-[#081731] text-[10px] font-semibold mb-1 uppercase tracking-wide">Dock {label}</span>
-              <div style={{ width: 40, height: (DOCK_B_ROWS * (CELL_H + ROW_GAP)) }} className="rounded-lg bg-gray-300 border-2 border-gray-400" />
+            <div key={label} className="flex flex-col items-center gap-1 opacity-20">
+              <span className="text-[#081731] text-[10px] font-semibold mb-1 uppercase tracking-widest">{label}</span>
+              <div style={{ width: 36, height: (DOCK_B_ROWS * (CELL_H + ROW_GAP)) }} className="rounded bg-gray-400" />
             </div>
           ))}
         </div>
@@ -105,25 +106,25 @@ export default function MapView({ onBoatClick }: Props) {
         {/* Water */}
         <div className="flex items-center justify-center py-5"
           style={{ background: "linear-gradient(180deg, #c8e6f5, #9ec8e8)" }}>
-          <span className="text-[#2A5B7D]/60 text-sm font-medium tracking-widest">
-            ~ ~ ~ LAKE WALLENPAUPACK ~ ~ ~
+          <span className="text-[#2A5B7D]/50 text-xs font-semibold tracking-[0.3em] uppercase">
+            Lake Wallenpaupack
           </span>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-5 px-6 py-3 bg-white border-t border-gray-100">
+        <div className="flex items-center gap-5 px-6 py-3 bg-white border-t border-black/5">
           {(Object.entries(statusConfig) as [BoatStatus, typeof statusConfig[BoatStatus]][]).map(([key, cfg]) => (
             <div key={key} className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-sm border flex-shrink-0"
                 style={{ backgroundColor: cfg.bg, borderColor: cfg.border }} />
-              <span className="text-xs text-gray-500">{cfg.label}</span>
+              <span className="text-xs text-[#4b4b4b]">{cfg.label}</span>
             </div>
           ))}
-          <div className="flex items-center gap-1.5 ml-2">
-            <span className="w-3 h-3 rounded-sm bg-gray-100 border border-gray-300 flex-shrink-0" />
-            <span className="text-xs text-gray-400">Customer Slip</span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-gray-100 border border-gray-200 flex-shrink-0" />
+            <span className="text-xs text-[#afafaf]">Customer Slip</span>
           </div>
-          <span className="text-xs text-gray-400 ml-auto">Click any boat for details</span>
+          <span className="text-xs text-[#afafaf] ml-auto">Click any boat to open details</span>
         </div>
       </div>
 
@@ -154,7 +155,7 @@ function DockStructure({ label, leftBoats, rightBoats, totalRows, customerSide, 
 
   return (
     <div className="flex flex-col items-center">
-      <span className="text-[#081731] text-[11px] font-bold mb-2 tracking-wide uppercase">{label}</span>
+      <span className="text-black text-[11px] font-bold mb-2 tracking-widest uppercase">{label}</span>
       <div className="flex items-start gap-0.5">
         {/* Left column */}
         <div className="flex flex-col gap-[3px]">
@@ -202,8 +203,8 @@ function DockStructure({ label, leftBoats, rightBoats, totalRows, customerSide, 
       </div>
 
       {/* Dock label at water end */}
-      <span className="text-[#2A5B7D]/50 text-[9px] mt-1.5 tracking-widest uppercase">
-        {label} Dock
+      <span className="text-[#2A5B7D]/40 text-[9px] mt-1.5 tracking-[0.25em] uppercase font-semibold">
+        Dock {label}
       </span>
     </div>
   );
