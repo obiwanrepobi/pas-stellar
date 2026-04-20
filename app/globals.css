@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f0f7fb;
+  --foreground: #081731;
+
+  /* PAS Brand Colors */
+  --pas-navy: #081731;
+  --pas-navy-mid: #1a3358;
+  --pas-teal: #5C9A9E;
+  --pas-blue: #2A5B7D;
+  --pas-light: #B5D4E8;
+  --pas-orange: #F09942;
+  --pas-water: #c8e6f5;
+  --pas-shore: #e8f0e4;
 }
 
 @theme inline {
@@ -10,13 +20,15 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-pas-navy: var(--pas-navy);
+  --color-pas-navy-mid: var(--pas-navy-mid);
+  --color-pas-teal: var(--pas-teal);
+  --color-pas-blue: var(--pas-blue);
+  --color-pas-light: var(--pas-light);
+  --color-pas-orange: var(--pas-orange);
+  --color-pas-water: var(--pas-water);
+  --color-pas-shore: var(--pas-shore);
 }
 
 body {
@@ -24,3 +36,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #B5D4E8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #5C9A9E; }
