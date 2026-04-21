@@ -333,7 +333,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                 active={presentMode}
                 title="Status badge"
                 description="Status syncs across the entire system. Changing it here updates the reservation calendar, the public website, and the staff view — simultaneously."
-                position="right"
+                position="bottom"
                 className="inline-flex"
               >
                 <span
@@ -401,7 +401,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                 active={presentMode}
                 title="Outstanding tasks"
                 description="Tasks like 'Talk to Sue by 4/26' stay on the boat record until resolved. They don't get buried in Slack or forgotten."
-                position="right"
+                position="left"
               >
                 <div>
                   <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-2">
@@ -424,7 +424,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
               active={presentMode}
               title="Manager notes"
               description="Notes are timestamped and tied to the logged-in employee. No more Slack messages that disappear into a channel."
-              position="right"
+              position="left"
             >
               <div>
                 <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-2">
@@ -445,7 +445,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
               active={presentMode}
               title="Photo documentation"
               description="Photos attach directly to the service record and are included automatically in the email to Matt — no forwarding or copying."
-              position="right"
+              position="left"
             >
               <div>
                 <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-2">
@@ -477,7 +477,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
               active={presentMode}
               title="Auto-draft email to service"
               description="The system writes the service email from the info above. Manager reviews, edits if needed, and sends — all from this screen. No copy-pasting."
-              position="right"
+              position="left"
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -520,7 +520,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                 active={presentMode}
                 title="Correspondence timeline"
                 description="Every reply from the service department is logged here in order. The full timeline lives on the boat record — not in someone's personal inbox."
-                position="right"
+                position="left"
               >
                 <div>
                   <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-3">
