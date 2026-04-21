@@ -101,7 +101,7 @@ export default function MaintenancePage() {
   };
 
   return (
-    <div className="px-8 py-6 max-w-[1200px]">
+    <div className="px-8 py-6">
       {/* Header */}
       <div className="flex items-end justify-between mb-6">
         <div>
