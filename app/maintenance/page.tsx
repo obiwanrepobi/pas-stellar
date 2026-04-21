@@ -161,9 +161,9 @@ export default function MaintenancePage() {
         active={presentMode}
         title="At-a-glance fleet health"
         description="At a glance, the manager sees the fleet's health before touching anything. No app to open, no dock walk needed."
-        position="bottom"
+        className="w-fit mb-6"
       >
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-full px-4 py-2.5">
             <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
             <span className="text-red-700 text-xs font-semibold">
