@@ -5,6 +5,7 @@ import { boats, statusConfig } from "../fleet/data";
 import type { Boat, BoatStatus } from "../fleet/data";
 import CompactDockMap from "./CompactDockMap";
 import CascadeModal from "./CascadeModal";
+import ClearForRentalModal from "./ClearForRentalModal";
 import FlagModal from "./FlagModal";
 import PresentBox from "./PresentBox";
 
@@ -103,6 +104,23 @@ const serviceHistoryData: Record<string, ServiceRecord[]> = {
   ],
 };
 
+// Last rental per boat
+type LastRenter = {
+  name: string;
+  date: string;
+  returned: string;
+  email: string;
+  phone: string;
+  bookingId: string;
+};
+const lastRenterData: Record<string, LastRenter> = {
+  "pp3-bermuda": { name: "Mike Caruso", date: "Apr 17, 10:00am – 3:00pm", returned: "Apr 17, 3:12pm", email: "mcaruso@gmail.com", phone: "(908) 555-0142", bookingId: "BK-20418" },
+  "sr3-gilgo": { name: "Dana & Tom Hewitt", date: "Apr 16, 8:00am – 1:00pm", returned: "Apr 16, 12:58pm", email: "dana.hewitt@yahoo.com", phone: "(570) 555-0287", bookingId: "BK-20391" },
+  "pp5-belize": { name: "Jordan Kline", date: "Apr 19, 8:00am – 1:00pm", returned: "Apr 19, 1:05pm", email: "jordankline22@gmail.com", phone: "(484) 555-0319", bookingId: "BK-20502" },
+  "pp7-barbados": { name: "Samir Patel", date: "Apr 19, 9:00am – 2:00pm", returned: "Apr 19, 2:03pm", email: "sampatel@outlook.com", phone: "(201) 555-0455", bookingId: "BK-20508" },
+  "sp3-antigua": { name: "Rachel Torres", date: "Apr 18, 10:00am – 3:00pm", returned: "Apr 18, 2:55pm", email: "rtorres.family@gmail.com", phone: "(973) 555-0612", bookingId: "BK-20477" },
+};
+
 // Expected return dates for calendar
 const expectedReturn: Record<string, { label: string; daysOut: number }> = {
   "pp3-bermuda": { label: "May 3", daysOut: 13 },
@@ -161,7 +179,9 @@ export default function MaintenancePage() {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [cascadeBoat, setCascadeBoat] = useState<Boat | null>(null);
   const [flagBoat, setFlagBoat] = useState<Boat | null>(null);
+  const [clearBoat, setClearBoat] = useState<Boat | null>(null);
   const [emailOpen, setEmailOpen] = useState<Record<string, boolean>>({});
+  const [renterOpen, setRenterOpen] = useState<Record<string, boolean>>({});
   const [noteValues, setNoteValues] = useState<Record<string, string>>({});
   const [selectedHistoryBoat, setSelectedHistoryBoat] = useState<string | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -298,10 +318,16 @@ export default function MaintenancePage() {
                   setExpandedCard((prev) => (prev === boat.id ? null : boat.id))
                 }
                 onTakeOOS={() => setCascadeBoat(boat)}
+                onClearForRental={() => setClearBoat(boat)}
                 emailOpen={emailOpen[boat.id] ?? false}
                 onToggleEmail={() =>
                   setEmailOpen((prev) => ({ ...prev, [boat.id]: !prev[boat.id] }))
                 }
+                renterOpen={renterOpen[boat.id] ?? false}
+                onToggleRenter={() =>
+                  setRenterOpen((prev) => ({ ...prev, [boat.id]: !prev[boat.id] }))
+                }
+                lastRenter={lastRenterData[boat.id] ?? null}
                 noteValue={noteValues[boat.id] ?? ""}
                 onNoteChange={(v) =>
                   setNoteValues((prev) => ({ ...prev, [boat.id]: v }))
@@ -392,6 +418,11 @@ export default function MaintenancePage() {
       {flagBoat && (
         <FlagModal boat={flagBoat} onClose={() => setFlagBoat(null)} />
       )}
+
+      {/* Clear for rental modal */}
+      {clearBoat && (
+        <ClearForRentalModal boat={clearBoat} onClose={() => setClearBoat(null)} />
+      )}
     </div>
   );
 }
@@ -405,8 +436,12 @@ interface IssueCardProps {
   expanded: boolean;
   onToggle: () => void;
   onTakeOOS: () => void;
+  onClearForRental: () => void;
   emailOpen: boolean;
   onToggleEmail: () => void;
+  renterOpen: boolean;
+  onToggleRenter: () => void;
+  lastRenter: LastRenter | null;
   noteValue: string;
   onNoteChange: (v: string) => void;
   correspondence: CorrespondenceEntry[];
@@ -421,8 +456,12 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
       expanded,
       onToggle,
       onTakeOOS,
+      onClearForRental,
       emailOpen,
       onToggleEmail,
+      renterOpen,
+      onToggleRenter,
+      lastRenter,
       noteValue,
       onNoteChange,
       correspondence,
@@ -495,6 +534,22 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                 {boat.outstandingTasks.length} task{boat.outstandingTasks.length !== 1 ? "s" : ""}
               </span>
             )}
+            {boat.status === "needs-maintenance" && (
+              <PresentBox
+                active={presentMode}
+                title="Clear for rental"
+                description="Override the maintenance flag for a busy weekend. Boat goes green immediately. You pick a date to automatically pull it back for service — no one has to remember."
+                position="left"
+                className="inline-flex"
+              >
+                <button
+                  onClick={(e) => { e.stopPropagation(); onClearForRental(); }}
+                  className="text-[10px] font-semibold px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                >
+                  Clear for Rental
+                </button>
+              </PresentBox>
+            )}
             {!isOOS && (
               <PresentBox
                 active={presentMode}
@@ -556,6 +611,51 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                       <p className="text-xs text-[#4b4b4b] leading-relaxed">{issueLog.note}</p>
                     </div>
                   </div>
+                </div>
+              </PresentBox>
+            )}
+
+            {/* Last renter */}
+            {lastRenter && (
+              <PresentBox
+                active={presentMode}
+                title="Last rental lookup"
+                description="The last person who rented the boat is one click away. If a guest caused damage, you can reach out directly without digging through booking records."
+                position="left"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest">
+                      Last Rental
+                    </p>
+                    <button
+                      onClick={onToggleRenter}
+                      className="text-[10px] font-semibold text-[#5C9A9E] hover:underline"
+                    >
+                      {renterOpen ? "Collapse" : "View Renter →"}
+                    </button>
+                  </div>
+                  {renterOpen && (
+                    <div className="bg-[#fafafa] rounded-xl border border-black/8 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-semibold text-sm text-black mb-0.5">{lastRenter.name}</p>
+                          <p className="text-[10px] text-[#afafaf] mb-3">{lastRenter.date}</p>
+                          <div className="space-y-1 text-xs text-[#4b4b4b]">
+                            <p><span className="font-semibold text-black">Returned:</span> {lastRenter.returned}</p>
+                            <p><span className="font-semibold text-black">Email:</span> {lastRenter.email}</p>
+                            <p><span className="font-semibold text-black">Phone:</span> {lastRenter.phone}</p>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 text-right">
+                          <p className="text-[9px] font-mono font-bold text-[#5C9A9E]">{lastRenter.bookingId}</p>
+                          <button className="mt-2 text-[10px] font-semibold text-white bg-black px-3 py-1.5 rounded-full hover:bg-[#1a1a1a] transition-colors">
+                            View Booking →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </PresentBox>
             )}
@@ -692,7 +792,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
               >
                 <div>
                   <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-3">
-                    Correspondence
+                    Emails Sent &amp; Received
                   </p>
                   <div className="space-y-3">
                     {correspondence.map((entry, i) => (
