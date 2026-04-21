@@ -11,10 +11,7 @@ export const metadata: Metadata = {
   description: "Fleet & Rental Management System",
 };
 
-const nav = [
-  { label: "Fleet", href: "/fleet" },
-  { label: "Maintenance", href: "/maintenance" },
-];
+const nav: { label: string; href: string }[] = [];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
