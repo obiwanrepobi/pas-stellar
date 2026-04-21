@@ -72,8 +72,8 @@ export default function CompactDockMap({ onBoatClick, presentMode }: Props) {
           <div className="flex gap-5 px-5 py-4 items-start">
             <DockStructure
               label="A"
-              leftBoats={dockALeft}
-              rightBoats={dockARight}
+              leftBoats={dockARight}
+              rightBoats={dockALeft}
               totalRows={DOCK_A_ROWS}
               customerSide={null}
               onHover={showTip}
