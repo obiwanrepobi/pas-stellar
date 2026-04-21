@@ -5,6 +5,7 @@ import { boats, statusConfig } from "../fleet/data";
 import type { Boat, BoatStatus } from "../fleet/data";
 import CompactDockMap from "./CompactDockMap";
 import CascadeModal from "./CascadeModal";
+import FlagModal from "./FlagModal";
 import PresentBox from "./PresentBox";
 
 // Only in-season boats with issues (no dry-dock)
@@ -16,31 +17,89 @@ const oosCount = boats.filter((b) => b.status === "out-of-service").length;
 const maintenanceCount = boats.filter((b) => b.status === "needs-maintenance").length;
 const openTasksCount = issueBoats.reduce((n, b) => n + b.outstandingTasks.length, 0);
 
-// Fake correspondence threads per boat
+// How employees first caught each issue
+type IssueLogEntry = {
+  employee: string;
+  timestamp: string;
+  source: "customer-return" | "dock-walk" | "morning-check" | "captain-report" | "scheduled";
+  note: string;
+};
+const sourceLabel: Record<IssueLogEntry["source"], string> = {
+  "customer-return": "Customer reported on return",
+  "dock-walk": "Dock walk",
+  "morning-check": "Morning check",
+  "captain-report": "Captain inspection post-rental",
+  "scheduled": "Scheduled maintenance",
+};
+const issueLogData: Record<string, IssueLogEntry> = {
+  "pp3-bermuda": { employee: "Tyler", timestamp: "Apr 17, 3:45pm", source: "captain-report", note: "Engine overheating on water — pulled back early. Temp gauge spiked past red. Not safe to go out again." },
+  "sr3-gilgo": { employee: "Kenny", timestamp: "Apr 16, 8:00am", source: "scheduled", note: "Pulled for scheduled oil change and impeller replacement. Routine service." },
+  "pp5-belize": { employee: "Zach", timestamp: "Apr 19, 5:30pm", source: "customer-return", note: "Rental customer mentioned vibration at high RPM when returning the boat. Prop looks nicked — possibly hit something shallow." },
+  "pp7-barbados": { employee: "Kenny", timestamp: "Apr 19, 6:00pm", source: "captain-report", note: "Steering resistance noticed during post-rental walkthrough. Still operational but not comfortable sending it out again." },
+  "sp3-antigua": { employee: "Zach", timestamp: "Apr 18, 4:15pm", source: "customer-return", note: "Guest pointed out upholstery tear on port side rear bench when returning. Cosmetic but needs repair before next busy weekend." },
+};
+
+// Email threads — only actual PAS ↔ service emails, no internal notes
 type CorrespondenceEntry = {
   date: string;
   author: string;
-  type: "note" | "sent" | "received";
+  type: "sent" | "received";
   content: string;
 };
 const correspondence: Record<string, CorrespondenceEntry[]> = {
   "pp3-bermuda": [
-    { date: "Apr 17", author: "Tyler", type: "note", content: "Engine overheating on water — pulled back early. Temp gauge spiked past red. Not safe." },
-    { date: "Apr 18", author: "Tyler", type: "sent", content: "Service request emailed to Matt. Photos attached." },
-    { date: "Apr 19", author: "Matt (Service)", type: "received", content: "Got your request. Looks like a thermostat or water pump. Parts on order — estimate 5–7 days." },
+    { date: "Apr 18", author: "Tyler → Matt", type: "sent", content: "Submitting service request for PP3 Bermuda — engine overheating, temp gauge spiked. Photos attached. Please advise on timeline." },
+    { date: "Apr 19", author: "Matt (Service)", type: "received", content: "Got your request. Looks like thermostat or water pump issue. Parts on order — estimate 5–7 business days." },
   ],
   "sr3-gilgo": [
-    { date: "Apr 16", author: "Kenny", type: "note", content: "Scheduled oil change + impeller replacement. Pulled for service Apr 16." },
-    { date: "Apr 16", author: "Dave", type: "sent", content: "Sent work order to Matt. Target return Apr 23." },
+    { date: "Apr 16", author: "Dave → Matt", type: "sent", content: "Sending SR3 Gilgo in for scheduled oil change and impeller replacement. Target return Apr 23 — let us know if anything else comes up during the service." },
+  ],
+};
+
+// Service history — full record per boat
+type ServiceRecord = {
+  date: string;
+  type: string;
+  description: string;
+  technician: string;
+  duration: string;
+  resolved: boolean;
+};
+const serviceHistoryData: Record<string, ServiceRecord[]> = {
+  "pp3-bermuda": [
+    { date: "Apr 17, 2026", type: "Engine — Overheating", description: "Temp gauge spiked mid-rental. Thermostat and water pump suspected. Parts on order.", technician: "Matt (Service)", duration: "In progress", resolved: false },
+    { date: "Mar 14, 2026", type: "Annual Pre-Season Service", description: "Full tune-up: oil change, fuel filter, impeller, battery check. All systems passed.", technician: "Matt (Service)", duration: "1 day", resolved: true },
+    { date: "Aug 22, 2025", type: "Engine — Overheating", description: "Similar overheating reported mid-season. Thermostat replaced. Returned to service following day.", technician: "Matt (Service)", duration: "2 days", resolved: true },
+    { date: "May 2, 2025", type: "Pre-Season Detail + Safety", description: "Full exterior detail, cover replacement, life jacket inventory, navigation light check.", technician: "Tyler + Kenny", duration: "1 day", resolved: true },
+  ],
+  "sr3-gilgo": [
+    { date: "Apr 16, 2026", type: "Scheduled — Oil + Impeller", description: "Routine oil change and impeller replacement. In service with Matt.", technician: "Matt (Service)", duration: "In progress", resolved: false },
+    { date: "Sep 5, 2025", type: "Prop Replacement", description: "Prop damaged after guest rental. Replaced with matching prop. Back in service same day.", technician: "Matt (Service)", duration: "4 hours", resolved: true },
+    { date: "May 3, 2025", type: "Pre-Season Service", description: "Oil change, impeller, fuel filter. Bilge pump tested. All clear.", technician: "Matt (Service)", duration: "1 day", resolved: true },
   ],
   "pp5-belize": [
-    { date: "Apr 19", author: "Zach", type: "note", content: "Prop looks nicked — possibly from a shallow spot. Vibration reported on high RPM." },
+    { date: "Apr 19, 2026", type: "Prop Damage — Inspection Needed", description: "Nicked prop reported after rental. Vibration at high RPM. Needs inspection before next run.", technician: "Pending", duration: "Pending", resolved: false },
+    { date: "Mar 14, 2026", type: "Annual Pre-Season Service", description: "Full tune-up and detail. No issues found.", technician: "Matt (Service)", duration: "1 day", resolved: true },
+    { date: "Jul 18, 2025", type: "Upholstery Repair", description: "Stern seat tear repaired. Same-day patch, full replacement scheduled for off-season.", technician: "Dave", duration: "2 hours", resolved: true },
   ],
   "pp7-barbados": [
-    { date: "Apr 19", author: "Kenny", type: "note", content: "Steering resistance reported by guest. Checked at dock — definitely stiff. Needs inspection before going out again." },
+    { date: "Apr 19, 2026", type: "Steering — Resistance", description: "Stiff steering reported post-rental. Flagged for inspection before next outing.", technician: "Pending", duration: "Pending", resolved: false },
+    { date: "Mar 14, 2026", type: "Annual Pre-Season Service", description: "Full service including steering cable lubrication. No issues at time of service.", technician: "Matt (Service)", duration: "1 day", resolved: true },
   ],
   "sp3-antigua": [
-    { date: "Apr 18", author: "Zach", type: "note", content: "Upholstery tear on port side rear bench. Guest reported it. Not unsafe — cosmetic, but needs repair before next weekend." },
+    { date: "Apr 18, 2026", type: "Upholstery — Tear", description: "Port side rear bench tear reported by guest. Cosmetic. Repair scheduled.", technician: "Pending", duration: "Pending", resolved: false },
+    { date: "Mar 15, 2026", type: "Annual Pre-Season Service", description: "Full tune-up. Interior detail and upholstery inspection — minor wear noted, no tears.", technician: "Matt (Service)", duration: "1 day", resolved: true },
+  ],
+  "pp1-tortola": [
+    { date: "Mar 14, 2026", type: "Annual Pre-Season Service", description: "Oil change, impeller, battery. Full detail. Ready for season.", technician: "Matt (Service)", duration: "1 day", resolved: true },
+    { date: "Aug 10, 2025", type: "Bilge Pump Replacement", description: "Bilge pump failed during inspection. Replaced same day.", technician: "Matt (Service)", duration: "3 hours", resolved: true },
+  ],
+  "pp2-jamaica": [
+    { date: "Mar 14, 2026", type: "Annual Pre-Season Service", description: "Full tune-up. No issues found.", technician: "Matt (Service)", duration: "1 day", resolved: true },
+  ],
+  "sr1-atlantique": [
+    { date: "Mar 15, 2026", type: "Annual Pre-Season Service", description: "Oil change, impeller, steering check. All clear.", technician: "Matt (Service)", duration: "1 day", resolved: true },
+    { date: "Jun 14, 2025", type: "Battery Replacement", description: "Battery wouldn't hold charge. Replaced with new unit.", technician: "Matt (Service)", duration: "1 hour", resolved: true },
   ],
 };
 
@@ -53,13 +112,28 @@ const expectedReturn: Record<string, { label: string; daysOut: number }> = {
   "sp3-antigua": { label: "Apr 25", daysOut: 5 },
 };
 
-function generateEmail(boat: Boat): string {
+function generateEmail(boat: Boat, hasReply: boolean): string {
+  if (hasReply) {
+    return `Hi Matt,
+
+Just following up on ${boat.name}${boat.code ? ` (${boat.code})` : ""} — wanted to check on the status.
+
+Last update we had was that parts were on order with an estimate of 5–7 business days. We're starting to get rental inquiries and want to plan around the return date.
+
+Any update on where things stand? Let us know if you need anything from our end.
+
+Thanks,
+Tyler
+PAS Rental Operations
+(570) 226-9229`;
+  }
+
   const tasks = boat.outstandingTasks.filter(
     (t) => !t.toLowerCase().includes("dave") && !t.toLowerCase().includes("sue")
   );
   return `Hi Matt,
 
-We have a service request for ${boat.name}${boat.code ? ` (${boat.code})` : ""}.
+Service request for ${boat.name}${boat.code ? ` (${boat.code})` : ""}.
 
 Make/Model: ${boat.make}
 Last out: ${boat.lastOut}
@@ -68,13 +142,13 @@ Dock: ${boat.dock} · Slip ${boat.slip}
 Issue:
 ${boat.maintenanceNote}${
     tasks.length > 0
-      ? `\n\nAdditional details:\n${tasks.map((t) => `• ${t}`).join("\n")}`
+      ? `\n\nAdditional notes:\n${tasks.map((t) => `• ${t}`).join("\n")}`
       : ""
   }
 
-Photos are attached to this request (3 images).
+3 photos attached.
 
-Please provide an estimated timeline for diagnosis and repair. This boat is currently out of service and unavailable for rentals until cleared.
+Please advise on timeline for diagnosis and repair. Boat is currently unavailable for rentals.
 
 Thanks,
 Tyler
@@ -86,18 +160,23 @@ export default function MaintenancePage() {
   const [presentMode, setPresentMode] = useState(false);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [cascadeBoat, setCascadeBoat] = useState<Boat | null>(null);
+  const [flagBoat, setFlagBoat] = useState<Boat | null>(null);
   const [emailOpen, setEmailOpen] = useState<Record<string, boolean>>({});
   const [noteValues, setNoteValues] = useState<Record<string, string>>({});
+  const [selectedHistoryBoat, setSelectedHistoryBoat] = useState<string | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const handleDockBoatClick = (boat: Boat) => {
     const isIssue =
       boat.status === "out-of-service" || boat.status === "needs-maintenance";
-    if (!isIssue) return;
-    setExpandedCard(boat.id);
-    setTimeout(() => {
-      cardRefs.current[boat.id]?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 50);
+    if (isIssue) {
+      setExpandedCard(boat.id);
+      setTimeout(() => {
+        cardRefs.current[boat.id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    } else {
+      setFlagBoat(boat);
+    }
   };
 
   return (
@@ -228,6 +307,7 @@ export default function MaintenancePage() {
                   setNoteValues((prev) => ({ ...prev, [boat.id]: v }))
                 }
                 correspondence={correspondence[boat.id] ?? []}
+                issueLog={issueLogData[boat.id] ?? null}
                 presentMode={presentMode}
                 ref={(el) => { cardRefs.current[boat.id] = el; }}
               />
@@ -256,9 +336,61 @@ export default function MaintenancePage() {
         </div>
       </PresentBox>
 
+      {/* Service History */}
+      <div id="service-history" className="bg-white rounded-2xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] overflow-hidden mt-6">
+        <div className="px-6 py-4 border-b border-black/5">
+          <h2 className="font-semibold text-sm text-black">Service History</h2>
+          <p className="text-xs text-[#afafaf] mt-0.5">Select any boat to view its full maintenance record</p>
+        </div>
+        <div className="px-6 py-4">
+          {/* Boat selector */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            {boats
+              .filter((b) => b.category !== "Utility" && serviceHistoryData[b.id])
+              .map((b) => {
+                const sc = statusConfig[b.status as BoatStatus];
+                const active = selectedHistoryBoat === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => setSelectedHistoryBoat(active ? null : b.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                      active
+                        ? "bg-black text-white border-black"
+                        : "bg-white text-[#4b4b4b] border-black/10 hover:border-black/30"
+                    }`}
+                  >
+                    {b.code || b.name.split(" ")[0]}
+                    {b.status !== "in-service" && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: active ? "white" : sc.dot }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+          </div>
+
+          {/* History table */}
+          {selectedHistoryBoat ? (
+            <ServiceHistoryTable records={serviceHistoryData[selectedHistoryBoat] ?? []} />
+          ) : (
+            <div className="text-center py-8 text-[#afafaf] text-sm">
+              Select a boat above to view its service record
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Cascade modal */}
       {cascadeBoat && (
         <CascadeModal boat={cascadeBoat} onClose={() => setCascadeBoat(null)} />
+      )}
+
+      {/* Flag for maintenance modal */}
+      {flagBoat && (
+        <FlagModal boat={flagBoat} onClose={() => setFlagBoat(null)} />
       )}
     </div>
   );
@@ -278,6 +410,7 @@ interface IssueCardProps {
   noteValue: string;
   onNoteChange: (v: string) => void;
   correspondence: CorrespondenceEntry[];
+  issueLog: IssueLogEntry | null;
   presentMode: boolean;
 }
 
@@ -293,6 +426,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
       noteValue,
       onNoteChange,
       correspondence,
+      issueLog,
       presentMode,
     },
     ref
@@ -395,6 +529,37 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
         {/* Expanded body */}
         {expanded && (
           <div className="border-t border-black/5 px-5 pb-5 pt-4 space-y-5">
+            {/* Issue log — how the problem was caught */}
+            {issueLog && (
+              <PresentBox
+                active={presentMode}
+                title="Issue log"
+                description="Every problem starts with someone catching it — a guest returning a boat, a captain's inspection, a morning check. This log records exactly who flagged it, when, and how it was discovered."
+                position="left"
+              >
+                <div className="bg-[#fafafa] rounded-xl border border-black/8 p-4">
+                  <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-3">
+                    Issue Logged
+                  </p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {issueLog.employee.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-semibold text-sm text-black">{issueLog.employee}</span>
+                        <span className="text-[10px] text-[#afafaf]">{issueLog.timestamp}</span>
+                        <span className="text-[9px] font-semibold bg-black/8 text-[#4b4b4b] px-2 py-0.5 rounded-full">
+                          {sourceLabel[issueLog.source]}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#4b4b4b] leading-relaxed">{issueLog.note}</p>
+                    </div>
+                  </div>
+                </div>
+              </PresentBox>
+            )}
+
             {/* Outstanding tasks */}
             {boat.outstandingTasks.length > 0 && (
               <PresentBox
@@ -499,7 +664,10 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                           <span className="font-semibold text-black">To:</span> matt@passervice.com
                         </span>
                         <span>
-                          <span className="font-semibold text-black">Subject:</span> Service Request — {boat.name}{boat.code ? ` (${boat.code})` : ""}
+                          <span className="font-semibold text-black">Subject:</span>{" "}
+                          {correspondence.some((e) => e.type === "received")
+                            ? `Re: Service Request — ${boat.name}${boat.code ? ` (${boat.code})` : ""}`
+                            : `Service Request — ${boat.name}${boat.code ? ` (${boat.code})` : ""}`}
                         </span>
                       </div>
                       <button className="bg-black text-white text-[10px] font-semibold px-3 py-1.5 rounded-full hover:bg-[#1a1a1a] transition-colors">
@@ -507,7 +675,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                       </button>
                     </div>
                     <pre className="text-[11px] text-[#4b4b4b] leading-relaxed px-4 py-3 whitespace-pre-wrap font-sans bg-white">
-                      {generateEmail(boat)}
+                      {generateEmail(boat, correspondence.some((e) => e.type === "received"))}
                     </pre>
                   </div>
                 )}
@@ -534,9 +702,7 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                             className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[8px] font-bold ${
                               entry.type === "received"
                                 ? "bg-[#5C9A9E]/15 text-[#5C9A9E]"
-                                : entry.type === "sent"
-                                ? "bg-black text-white"
-                                : "bg-[#efefef] text-[#4b4b4b]"
+                                : "bg-black text-white"
                             }`}
                           >
                             {entry.author.charAt(0)}
@@ -553,12 +719,10 @@ const IssueCard = React.forwardRef<HTMLDivElement, IssueCardProps>(
                               className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-full ${
                                 entry.type === "received"
                                   ? "bg-[#5C9A9E]/10 text-[#5C9A9E]"
-                                  : entry.type === "sent"
-                                  ? "bg-black/10 text-black"
-                                  : "bg-[#f5f5f5] text-[#afafaf]"
+                                  : "bg-black/10 text-black"
                               }`}
                             >
-                              {entry.type === "received" ? "Reply" : entry.type === "sent" ? "Sent" : "Note"}
+                              {entry.type === "received" ? "Reply from Matt" : "Sent"}
                             </span>
                           </div>
                           <p className="text-xs text-[#4b4b4b] leading-relaxed">{entry.content}</p>
@@ -668,6 +832,54 @@ function CalendarStrip({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ─── Service History Table ────────────────────────────────────────────────────
+
+function ServiceHistoryTable({ records }: { records: ServiceRecord[] }) {
+  if (records.length === 0) {
+    return <p className="text-sm text-[#afafaf] py-4">No service records found.</p>;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-black/8">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-[#f5f5f5] border-b border-black/5">
+            {["Date", "Service Type", "Description", "Technician", "Duration", "Status"].map((h) => (
+              <th key={h} className="text-left px-4 py-3 text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((r, i) => (
+            <tr key={i} className={`border-b border-black/5 ${i % 2 === 0 ? "" : "bg-[#fafafa]"}`}>
+              <td className="px-4 py-3 text-xs text-[#4b4b4b] whitespace-nowrap">{r.date}</td>
+              <td className="px-4 py-3 text-xs font-semibold text-black">{r.type}</td>
+              <td className="px-4 py-3 text-xs text-[#4b4b4b] max-w-xs">{r.description}</td>
+              <td className="px-4 py-3 text-xs text-[#4b4b4b]">{r.technician}</td>
+              <td className="px-4 py-3 text-xs text-[#4b4b4b]">{r.duration}</td>
+              <td className="px-4 py-3">
+                {r.resolved ? (
+                  <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-semibold px-2 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Resolved
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-semibold px-2 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    In Progress
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

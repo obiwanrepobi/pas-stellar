@@ -331,7 +331,11 @@ function DockTooltip({
       </div>
 
       <p className="text-[8px] mt-2.5 font-medium text-[#5C9A9E]">
-        {presentMode ? "Click to jump to maintenance record →" : "Click for details →"}
+        {presentMode
+          ? "Click to jump to maintenance record →"
+          : boat.status === "in-service"
+          ? "Click to flag for maintenance →"
+          : "Click for details →"}
       </p>
     </div>
   );
