@@ -1,59 +1,95 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface Props {
   children: React.ReactNode;
   title: string;
   description: string;
   active: boolean;
-  position?: "top" | "bottom" | "left" | "right";
   className?: string;
+  // position is now a hint only; auto-calculated from viewport space
+  position?: "top" | "bottom" | "left" | "right";
 }
+
+const POPOVER_W = 264;
+const POPOVER_H = 130;
+const GAP = 12;
 
 export default function PresentBox({
   children,
   title,
   description,
   active,
-  position = "right",
   className = "",
 }: Props) {
-  const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   if (!active) return <div className={className}>{children}</div>;
 
-  const popoverPos =
-    position === "right" ? "left-full top-0 ml-3" :
-    position === "left"  ? "right-full top-0 mr-3" :
-    position === "top"   ? "bottom-full left-0 mb-3" :
-                           "top-full left-0 mt-3";
+  const handleMouseEnter = () => {
+    if (!wrapperRef.current) return;
+    const r = wrapperRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
 
-  const arrowCls =
-    position === "right" ? "absolute left-0 top-5 -translate-x-[5px] border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[5px] border-r-[#081731]" :
-    position === "left"  ? "absolute right-0 top-5 translate-x-[5px] border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[5px] border-l-[#081731]" :
-    position === "top"   ? "absolute bottom-0 left-5 translate-y-[5px] border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-[#081731]" :
-                           "absolute top-0 left-5 -translate-y-[5px] border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[5px] border-b-[#081731]";
+    let x: number;
+    let y: number;
+
+    const spaceRight = vw - r.right;
+    const spaceLeft = r.left;
+    const spaceBelow = vh - r.bottom;
+
+    if (spaceRight >= POPOVER_W + GAP) {
+      // Preferred: right of element
+      x = r.right + GAP;
+      y = r.top;
+    } else if (spaceLeft >= POPOVER_W + GAP) {
+      // Left of element
+      x = r.left - POPOVER_W - GAP;
+      y = r.top;
+    } else if (spaceBelow >= POPOVER_H + GAP) {
+      // Below element
+      x = r.left;
+      y = r.bottom + GAP;
+    } else {
+      // Above element
+      x = r.left;
+      y = r.top - POPOVER_H - GAP;
+    }
+
+    // Clamp to viewport
+    x = Math.max(8, Math.min(x, vw - POPOVER_W - 8));
+    y = Math.max(8, Math.min(y, vh - POPOVER_H - 8));
+
+    setCoords({ x, y });
+  };
 
   return (
     <div
+      ref={wrapperRef}
       className={`relative ${className}`}
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setCoords(null)}
     >
       {children}
 
-      {/* Dashed ring overlay */}
+      {/* Dashed highlight ring */}
       <div className="absolute inset-0 rounded-xl pointer-events-none border-2 border-dashed border-[#5C9A9E]/50 z-10" />
 
-      {/* Popover */}
-      {visible && (
-        <div className={`absolute z-[200] w-64 pointer-events-none ${popoverPos}`}>
-          <div className="relative bg-[#081731] rounded-xl p-4 shadow-2xl border border-white/10">
-            <div className={arrowCls} />
+      {/* Fixed-position popover — always stays in viewport */}
+      {coords && (
+        <div
+          className="fixed z-[300] pointer-events-none"
+          style={{ left: coords.x, top: coords.y, width: POPOVER_W }}
+        >
+          <div className="bg-[#081731] rounded-xl p-4 shadow-2xl border border-white/10">
             <div className="flex items-center gap-2 mb-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#5C9A9E] flex-shrink-0" />
-              <p className="text-[#5C9A9E] text-[9px] font-bold uppercase tracking-widest">How it works</p>
+              <p className="text-[#5C9A9E] text-[9px] font-bold uppercase tracking-widest">
+                How it works
+              </p>
             </div>
             <p className="font-bold text-sm text-white mb-1.5">{title}</p>
             <p className="text-white/65 text-xs leading-relaxed">{description}</p>

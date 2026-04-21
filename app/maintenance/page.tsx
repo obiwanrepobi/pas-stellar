@@ -646,17 +646,18 @@ function CalendarStrip({
                     />
                   ))}
                 </div>
-                {/* Bar */}
-                <div
-                  style={{
-                    width: barWidth,
-                    backgroundColor: sc.bg,
-                    borderColor: sc.border,
-                  }}
-                  className="relative h-5 rounded-full border flex items-center justify-end pr-2"
-                >
+                {/* Bar + label outside */}
+                <div className="flex items-center gap-2">
+                  <div
+                    style={{
+                      width: barWidth,
+                      backgroundColor: sc.bg,
+                      borderColor: sc.border,
+                    }}
+                    className="h-5 rounded-full border flex-shrink-0"
+                  />
                   <span
-                    className="text-[9px] font-semibold"
+                    className="text-[10px] font-semibold whitespace-nowrap"
                     style={{ color: sc.text }}
                   >
                     {ret?.label ?? "TBD"}
