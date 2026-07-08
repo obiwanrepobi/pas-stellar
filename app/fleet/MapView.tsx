@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Boat, boats as allBoats, statusConfig, BoatStatus } from "./data";
+import { Boat, boats as allBoats, statusConfig, BoatStatus, cleaningConfig } from "./data";
+import { useFleet } from "./fleetState";
 
 interface Props {
   onBoatClick: (boat: Boat) => void;
@@ -219,6 +220,7 @@ interface SlipCellProps {
 }
 
 function SlipCell({ boat, isCustomer, onHover, onLeave, onClick }: SlipCellProps) {
+  const fleet = useFleet();
   if (isCustomer) {
     return (
       <div
@@ -241,6 +243,7 @@ function SlipCell({ boat, isCustomer, onHover, onLeave, onClick }: SlipCellProps
 
   const sc = statusConfig[boat.status];
   const displayLabel = boat.code || boat.name.split(" ")[0];
+  const cleanStage = fleet?.cleaning[boat.id];
 
   return (
     <div
@@ -262,12 +265,20 @@ function SlipCell({ boat, isCustomer, onHover, onLeave, onClick }: SlipCellProps
       {boat.outstandingTasks.length > 0 && (
         <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-400 border border-white" />
       )}
+      {cleanStage && cleanStage !== "clean" && (
+        <span
+          className="absolute bottom-0.5 left-0.5 w-2 h-2 rounded-full border border-white"
+          style={{ backgroundColor: cleaningConfig[cleanStage].dot }}
+        />
+      )}
     </div>
   );
 }
 
 function BoatTooltip({ boat, x, y }: { boat: Boat; x: number; y: number }) {
   const sc = statusConfig[boat.status];
+  const fleet = useFleet();
+  const cleanStage = fleet?.cleaning[boat.id];
 
   const left = x + 16;
   const top = Math.max(8, y - 120);
@@ -312,11 +323,18 @@ function BoatTooltip({ boat, x, y }: { boat: Boat; x: number; y: number }) {
 
       {/* Details */}
       <div className="space-y-1.5 text-xs">
-        <TRow
-          label="AM Check"
-          value={boat.morningCheckDone ? `✓ ${boat.morningCheckBy}` : "✗ Not done"}
-          warn={!boat.morningCheckDone}
-        />
+        {fleet?.outToday.has(boat.id) ? (
+          <TRow
+            label="AM Check"
+            value={boat.morningCheckDone ? `✓ ${boat.morningCheckBy}` : "✗ Not done"}
+            warn={!boat.morningCheckDone}
+          />
+        ) : (
+          <TRow label="AM Check" value="Not out today" />
+        )}
+        {cleanStage && (
+          <TRow label="Cleaning" value={cleaningConfig[cleanStage].label} warn={cleanStage === "needs-cleaning"} />
+        )}
         <TRow label="Last Cleaned" value={`${boat.lastCleaned} · ${boat.lastCleanedBy}`} />
         <TRow label="Next Out" value={boat.nextOut} />
         {boat.outstandingTasks.length > 0 && (

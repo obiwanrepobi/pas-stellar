@@ -1,6 +1,7 @@
 "use client";
 
-import { Boat, statusConfig } from "./data";
+import { Boat, statusConfig, cleaningConfig } from "./data";
+import { useFleet } from "./fleetState";
 
 interface Props {
   boat: Boat;
@@ -9,6 +10,11 @@ interface Props {
 
 export default function BoatModal({ boat, onClose }: Props) {
   const sc = statusConfig[boat.status];
+  const fleet = useFleet();
+  const stage = fleet?.cleaning[boat.id] ?? "clean";
+  const cc = cleaningConfig[stage];
+  const stamp = fleet?.cleanStamp[boat.id];
+  const goingOut = fleet?.outToday.has(boat.id) ?? false;
 
   return (
     <div
@@ -133,23 +139,38 @@ export default function BoatModal({ boat, onClose }: Props) {
           {/* Daily Upkeep */}
           <Section title="Daily Upkeep">
             <div className="space-y-2.5">
-              <Row
-                label="Morning Check"
-                value={
-                  boat.morningCheckDone
-                    ? `✓ Done — ${boat.morningCheckBy}`
-                    : "✗ Not completed"
-                }
-                ok={boat.morningCheckDone}
-              />
+              {goingOut ? (
+                <Row
+                  label="Morning Check"
+                  value={boat.morningCheckDone ? `✓ Done — ${boat.morningCheckBy}` : "✗ Not completed"}
+                  ok={boat.morningCheckDone}
+                />
+              ) : (
+                <Row label="Morning Check" value="Not going out today" ok={true} />
+              )}
+
+              {/* Cleaning stage — click to advance (needs → cleaning → clean) */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500 font-medium">Cleaning</span>
+                <button
+                  onClick={() => fleet?.cycleClean(boat.id)}
+                  title="Click to advance cleaning stage"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border hover:opacity-75 transition-opacity"
+                  style={{ backgroundColor: cc.bg, borderColor: cc.border, color: cc.text }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cc.dot }} />
+                  {cc.label}
+                </button>
+              </div>
+
               <Row
                 label="Last Cleaned"
-                value={`${boat.lastCleaned} · by ${boat.lastCleanedBy}`}
+                value={stamp ? `${stamp.date} · just cleaned` : `${boat.lastCleaned} · by ${boat.lastCleanedBy}`}
                 ok={true}
               />
               <Row
                 label="Signed Off By"
-                value={boat.cleaningSignedOffBy}
+                value={stamp ? stamp.by : boat.cleaningSignedOffBy}
                 ok={true}
               />
             </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Boat, BoatStatus, statusConfig } from "./data";
+import { Boat, BoatStatus, statusConfig, cleaningConfig } from "./data";
+import { useFleet } from "./fleetState";
 
 interface Props {
   boats: Boat[];
@@ -13,16 +14,14 @@ const filters: { label: string; value: BoatStatus | "all" }[] = [
   { label: "In Service", value: "in-service" },
   { label: "Needs Maintenance", value: "needs-maintenance" },
   { label: "Out of Service", value: "out-of-service" },
-  { label: "Dry Dock", value: "dry-dock" },
 ];
 
 export default function ListView({ boats, onBoatClick }: Props) {
   const [activeFilter, setActiveFilter] = useState<BoatStatus | "all">("all");
   const [search, setSearch] = useState("");
+  const fleet = useFleet();
 
-  const rentalBoats = boats.filter(
-    (b) => b.category !== "Utility"
-  );
+  const rentalBoats = boats.filter((b) => b.category !== "Utility");
 
   const filtered = rentalBoats.filter((b) => {
     const matchesFilter = activeFilter === "all" || b.status === activeFilter;
@@ -81,7 +80,7 @@ export default function ListView({ boats, onBoatClick }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {["Status", "Boat", "Category", "Dock", "HP", "Cap.", "Last Cleaned", "AM Check", "Next Out", "Tasks"].map(
+              {["Status", "Boat", "Category", "Dock", "HP", "Cap.", "Last Cleaned", "Cleaning", "AM Check", "Next Out", "Tasks"].map(
                 (h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     {h}
@@ -93,6 +92,10 @@ export default function ListView({ boats, onBoatClick }: Props) {
           <tbody>
             {filtered.map((boat, idx) => {
               const sc = statusConfig[boat.status];
+              const stage = fleet?.cleaning[boat.id] ?? "clean";
+              const cc = cleaningConfig[stage];
+              const stamp = fleet?.cleanStamp[boat.id];
+              const goingOut = fleet?.outToday.has(boat.id) ?? false;
               return (
                 <tr
                   key={boat.id}
@@ -101,7 +104,7 @@ export default function ListView({ boats, onBoatClick }: Props) {
                     idx % 2 === 0 ? "bg-white" : "bg-gray-50/40"
                   }`}
                 >
-                  {/* Status dot */}
+                  {/* Status */}
                   <td className="px-4 py-3">
                     <span
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap"
@@ -131,13 +134,39 @@ export default function ListView({ boats, onBoatClick }: Props) {
                   <td className="px-4 py-3 text-gray-700 text-xs font-medium">{boat.hp}</td>
                   <td className="px-4 py-3 text-gray-700 text-xs font-medium">{boat.capacity}</td>
 
+                  {/* Last cleaned (reflects a fresh check-off if one happened) */}
                   <td className="px-4 py-3">
-                    <div className="text-xs text-gray-700">{boat.lastCleaned}</div>
-                    <div className="text-[10px] text-gray-400">by {boat.lastCleanedBy} · ✓ {boat.cleaningSignedOffBy}</div>
+                    {stamp ? (
+                      <>
+                        <div className="text-xs text-gray-700">{stamp.date} · just cleaned</div>
+                        <div className="text-[10px] text-gray-400">✓ {stamp.by}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-xs text-gray-700">{boat.lastCleaned}</div>
+                        <div className="text-[10px] text-gray-400">by {boat.lastCleanedBy} · ✓ {boat.cleaningSignedOffBy}</div>
+                      </>
+                    )}
                   </td>
 
+                  {/* Cleaning stage — click to advance (needs → cleaning → clean) */}
                   <td className="px-4 py-3">
-                    {boat.morningCheckDone ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); fleet?.cycleClean(boat.id); }}
+                      title="Click to advance cleaning stage"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap hover:opacity-75 transition-opacity"
+                      style={{ backgroundColor: cc.bg, borderColor: cc.border, color: cc.text }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cc.dot }} />
+                      {cc.short}
+                    </button>
+                  </td>
+
+                  {/* AM check — only relevant if the boat is going out today */}
+                  <td className="px-4 py-3">
+                    {!goingOut ? (
+                      <span className="text-gray-300 text-xs">—</span>
+                    ) : boat.morningCheckDone ? (
                       <span className="text-emerald-600 text-xs font-semibold">✓ {boat.morningCheckBy}</span>
                     ) : (
                       <span className="text-red-500 text-xs font-semibold">✗ Pending</span>
@@ -169,7 +198,7 @@ export default function ListView({ boats, onBoatClick }: Props) {
       </div>
 
       <p className="text-xs text-gray-400 mt-3 text-right">
-        Showing {filtered.length} of {rentalBoats.length} vessels
+        Showing {filtered.length} of {rentalBoats.length} vessels · click a cleaning tag to advance it
       </p>
     </div>
   );

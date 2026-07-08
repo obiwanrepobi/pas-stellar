@@ -155,3 +155,26 @@ export const fmtRange = (s: number, e: number) => `${fmt(s)} – ${fmt(e)}`;
 export const pctLeft = (min: number) =>
   ((min - DAY_START) / (DAY_END - DAY_START)) * 100;
 export const pctWidth = (dur: number) => (dur / (DAY_END - DAY_START)) * 100;
+
+// Open start windows for ONE specific boat (used when you click that boat's open
+// lane to answer "what can I start on this one?").
+export function boatOpenWindows(boatId: string): {
+  half: { start: number; end: number }[];
+  full: { start: number; end: number }[];
+} {
+  const free = (s: number, e: number) =>
+    reservationsForBoat(boatId).every(
+      (r) => resEnd(r) + BUFFER_MIN <= s || e + BUFFER_MIN <= r.start
+    );
+  const build = (starts: number[], dur: number) =>
+    starts.filter((s) => s + dur <= DAY_END && free(s, s + dur)).map((s) => ({ start: s, end: s + dur }));
+  return { half: build(HALF_STARTS, HALF_MIN), full: build(FULL_STARTS, FULL_MIN) };
+}
+
+// The TYPICAL standard schedule (the laminated desk card) — same across categories,
+// split morning / afternoon. Reference only; not tied to today's bookings.
+export const typicalWindows = {
+  full: FULL_STARTS.map((s) => ({ start: s, end: s + FULL_MIN })),
+  halfMorning: HALF_STARTS.filter((s) => s < 12 * 60).map((s) => ({ start: s, end: s + HALF_MIN })),
+  halfAfternoon: HALF_STARTS.filter((s) => s >= 12 * 60).map((s) => ({ start: s, end: s + HALF_MIN })),
+};

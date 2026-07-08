@@ -618,3 +618,28 @@ export const statusConfig = {
     dot: "#94a3b8",
   },
 };
+
+// ─── Cleaning workflow (3 stages) ─────────────────────────────────────────────
+export type CleaningStage = "needs-cleaning" | "getting-cleaned" | "clean";
+
+export const cleaningConfig: Record<
+  CleaningStage,
+  { label: string; short: string; dot: string; bg: string; border: string; text: string }
+> = {
+  "needs-cleaning": { label: "Needs Cleaning", short: "Needs Clean", dot: "#ef4444", bg: "#fee2e2", border: "#fca5a5", text: "#7f1d1d" },
+  "getting-cleaned": { label: "Getting Cleaned", short: "Cleaning", dot: "#3b82f6", bg: "#dbeafe", border: "#93c5fd", text: "#1e3a8a" },
+  "clean": { label: "Clean", short: "Clean", dot: "#10b981", bg: "#d1fae5", border: "#6ee7b7", text: "#064e3b" },
+};
+
+// Seed: after a busy weekend, a chunk of boats need re-cleaning; the rest are clean.
+const NEEDS_CLEANING = new Set([
+  "pp1-tortola", "pp4-curacao", "pp6-bahamas", "sp1-kitts", "sp4-costa-rica",
+  "sr1-atlantique", "sr2-montauk", "ep1-eppley", "s1-grand-turk", "s2-cozumel",
+]);
+export const initialCleaning = (): Record<string, CleaningStage> => {
+  const map: Record<string, CleaningStage> = {};
+  boats.forEach((b) => {
+    if (b.category !== "Utility") map[b.id] = NEEDS_CLEANING.has(b.id) ? "needs-cleaning" : "clean";
+  });
+  return map;
+};
