@@ -25,7 +25,7 @@ export default function FleetPage() {
   const [selectedBoat, setSelectedBoat] = useState<Boat | null>(null);
 
   return (
-    <div className="px-8 py-6 max-w-[1440px]">
+    <div className="px-8 py-6 max-w-[1800px] mx-auto w-full">
       {/* Page title */}
       <div className="flex items-end justify-between mb-6">
         <div>

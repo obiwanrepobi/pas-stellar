@@ -36,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               />
               <div className="w-px h-5 bg-white/20" />
               <span className="font-bold text-sm tracking-tight">Stellar</span>
-              <span className="text-white/30 text-xs font-medium">V.2</span>
+              <span className="text-white/50 text-xs font-medium">V.2</span>
             </div>
 
             {/* Center: nav */}
@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="px-4 py-1.5 rounded-full text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                  className="px-4 py-1.5 rounded-full text-sm font-medium text-white/85 hover:text-white hover:bg-white/10 transition-all"
                 >
                   {item.label}
                 </Link>
@@ -54,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             {/* Right: context */}
             <div className="flex items-center gap-3">
-              <span className="text-white/30 text-xs">Sat, Jul 18, 2026</span>
+              <span className="text-white/60 text-xs">Sat, Jul 18, 2026</span>
               <div className="w-7 h-7 rounded-full bg-[#5C9A9E] flex items-center justify-center text-white text-xs font-bold">
                 S
               </div>

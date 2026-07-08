@@ -33,11 +33,11 @@ const sourceLabel: Record<IssueLogEntry["source"], string> = {
   "scheduled": "Scheduled maintenance",
 };
 const issueLogData: Record<string, IssueLogEntry> = {
-  "pp3-bermuda": { employee: "Tyler", timestamp: "Apr 17, 3:45pm", source: "captain-report", note: "Engine overheating on water — pulled back early. Temp gauge spiked past red. Not safe to go out again." },
-  "sr3-gilgo": { employee: "Kenny", timestamp: "Apr 16, 8:00am", source: "scheduled", note: "Pulled for scheduled oil change and impeller replacement. Routine service." },
-  "pp5-belize": { employee: "Zach", timestamp: "Apr 19, 5:30pm", source: "customer-return", note: "Rental customer mentioned vibration at high RPM when returning the boat. Prop looks nicked — possibly hit something shallow." },
-  "pp7-barbados": { employee: "Kenny", timestamp: "Apr 19, 6:00pm", source: "captain-report", note: "Steering resistance noticed during post-rental walkthrough. Still operational but not comfortable sending it out again." },
-  "sp3-antigua": { employee: "Zach", timestamp: "Apr 18, 4:15pm", source: "customer-return", note: "Guest pointed out upholstery tear on port side rear bench when returning. Cosmetic but needs repair before next busy weekend." },
+  "pp3-bermuda": { employee: "Tyler", timestamp: "Jul 15, 3:45pm", source: "captain-report", note: "Engine overheating on water — pulled back early. Temp gauge spiked past red. Not safe to go out again." },
+  "sr3-gilgo": { employee: "Kenny", timestamp: "Jul 14, 8:00am", source: "scheduled", note: "Pulled for scheduled oil change and impeller replacement. Routine service." },
+  "pp5-belize": { employee: "Zach", timestamp: "Jul 17, 5:30pm", source: "customer-return", note: "Rental customer mentioned vibration at high RPM when returning the boat. Prop looks nicked — possibly hit something shallow." },
+  "pp7-barbados": { employee: "Kenny", timestamp: "Jul 17, 6:00pm", source: "captain-report", note: "Steering resistance noticed during post-rental walkthrough. Still operational but not comfortable sending it out again." },
+  "sp3-antigua": { employee: "Zach", timestamp: "Jul 16, 4:15pm", source: "customer-return", note: "Guest pointed out upholstery tear on port side rear bench when returning. Cosmetic but needs repair before next busy weekend." },
 };
 
 // Email threads — only actual PAS ↔ service emails, no internal notes
@@ -49,11 +49,11 @@ type CorrespondenceEntry = {
 };
 const correspondence: Record<string, CorrespondenceEntry[]> = {
   "pp3-bermuda": [
-    { date: "Apr 18", author: "Tyler → Matt", type: "sent", content: "Submitting service request for PP3 Bermuda — engine overheating, temp gauge spiked. Photos attached. Please advise on timeline." },
-    { date: "Apr 19", author: "Matt (Service)", type: "received", content: "Got your request. Looks like thermostat or water pump issue. Parts on order — estimate 5–7 business days." },
+    { date: "Jul 16", author: "Tyler → Matt", type: "sent", content: "Submitting service request for PP3 Bermuda — engine overheating, temp gauge spiked. Photos attached. Please advise on timeline." },
+    { date: "Jul 17", author: "Matt (Service)", type: "received", content: "Got your request. Looks like thermostat or water pump issue. Parts on order — estimate 5–7 business days." },
   ],
   "sr3-gilgo": [
-    { date: "Apr 16", author: "Dave → Matt", type: "sent", content: "Sending SR3 Gilgo in for scheduled oil change and impeller replacement. Target return Apr 23 — let us know if anything else comes up during the service." },
+    { date: "Jul 14", author: "Dave → Matt", type: "sent", content: "Sending SR3 Gilgo in for scheduled oil change and impeller replacement. Target return Jul 21 — let us know if anything else comes up during the service." },
   ],
 };
 
@@ -68,27 +68,27 @@ type ServiceRecord = {
 };
 const serviceHistoryData: Record<string, ServiceRecord[]> = {
   "pp3-bermuda": [
-    { date: "Apr 17, 2026", type: "Engine — Overheating", description: "Temp gauge spiked mid-rental. Thermostat and water pump suspected. Parts on order.", technician: "Matt (Service)", duration: "In progress", resolved: false },
+    { date: "Jul 15, 2026", type: "Engine — Overheating", description: "Temp gauge spiked mid-rental. Thermostat and water pump suspected. Parts on order.", technician: "Matt (Service)", duration: "In progress", resolved: false },
     { date: "Mar 14, 2026", type: "Annual Pre-Season Service", description: "Full tune-up: oil change, fuel filter, impeller, battery check. All systems passed.", technician: "Matt (Service)", duration: "1 day", resolved: true },
     { date: "Aug 22, 2025", type: "Engine — Overheating", description: "Similar overheating reported mid-season. Thermostat replaced. Returned to service following day.", technician: "Matt (Service)", duration: "2 days", resolved: true },
     { date: "May 2, 2025", type: "Pre-Season Detail + Safety", description: "Full exterior detail, cover replacement, life jacket inventory, navigation light check.", technician: "Tyler + Kenny", duration: "1 day", resolved: true },
   ],
   "sr3-gilgo": [
-    { date: "Apr 16, 2026", type: "Scheduled — Oil + Impeller", description: "Routine oil change and impeller replacement. In service with Matt.", technician: "Matt (Service)", duration: "In progress", resolved: false },
+    { date: "Jul 14, 2026", type: "Scheduled — Oil + Impeller", description: "Routine oil change and impeller replacement. In service with Matt.", technician: "Matt (Service)", duration: "In progress", resolved: false },
     { date: "Sep 5, 2025", type: "Prop Replacement", description: "Prop damaged after guest rental. Replaced with matching prop. Back in service same day.", technician: "Matt (Service)", duration: "4 hours", resolved: true },
     { date: "May 3, 2025", type: "Pre-Season Service", description: "Oil change, impeller, fuel filter. Bilge pump tested. All clear.", technician: "Matt (Service)", duration: "1 day", resolved: true },
   ],
   "pp5-belize": [
-    { date: "Apr 19, 2026", type: "Prop Damage — Inspection Needed", description: "Nicked prop reported after rental. Vibration at high RPM. Needs inspection before next run.", technician: "Pending", duration: "Pending", resolved: false },
+    { date: "Jul 17, 2026", type: "Prop Damage — Inspection Needed", description: "Nicked prop reported after rental. Vibration at high RPM. Needs inspection before next run.", technician: "Pending", duration: "Pending", resolved: false },
     { date: "Mar 14, 2026", type: "Annual Pre-Season Service", description: "Full tune-up and detail. No issues found.", technician: "Matt (Service)", duration: "1 day", resolved: true },
     { date: "Jul 18, 2025", type: "Upholstery Repair", description: "Stern seat tear repaired. Same-day patch, full replacement scheduled for off-season.", technician: "Dave", duration: "2 hours", resolved: true },
   ],
   "pp7-barbados": [
-    { date: "Apr 19, 2026", type: "Steering — Resistance", description: "Stiff steering reported post-rental. Flagged for inspection before next outing.", technician: "Pending", duration: "Pending", resolved: false },
+    { date: "Jul 17, 2026", type: "Steering — Resistance", description: "Stiff steering reported post-rental. Flagged for inspection before next outing.", technician: "Pending", duration: "Pending", resolved: false },
     { date: "Mar 14, 2026", type: "Annual Pre-Season Service", description: "Full service including steering cable lubrication. No issues at time of service.", technician: "Matt (Service)", duration: "1 day", resolved: true },
   ],
   "sp3-antigua": [
-    { date: "Apr 18, 2026", type: "Upholstery — Tear", description: "Port side rear bench tear reported by guest. Cosmetic. Repair scheduled.", technician: "Pending", duration: "Pending", resolved: false },
+    { date: "Jul 16, 2026", type: "Upholstery — Tear", description: "Port side rear bench tear reported by guest. Cosmetic. Repair scheduled.", technician: "Pending", duration: "Pending", resolved: false },
     { date: "Mar 15, 2026", type: "Annual Pre-Season Service", description: "Full tune-up. Interior detail and upholstery inspection — minor wear noted, no tears.", technician: "Matt (Service)", duration: "1 day", resolved: true },
   ],
   "pp1-tortola": [
@@ -114,20 +114,20 @@ type LastRenter = {
   bookingId: string;
 };
 const lastRenterData: Record<string, LastRenter> = {
-  "pp3-bermuda": { name: "Mike Caruso", date: "Apr 17, 10:00am – 3:00pm", returned: "Apr 17, 3:12pm", email: "mcaruso@gmail.com", phone: "(908) 555-0142", bookingId: "BK-20418" },
-  "sr3-gilgo": { name: "Dana & Tom Hewitt", date: "Apr 16, 8:00am – 1:00pm", returned: "Apr 16, 12:58pm", email: "dana.hewitt@yahoo.com", phone: "(570) 555-0287", bookingId: "BK-20391" },
-  "pp5-belize": { name: "Jordan Kline", date: "Apr 19, 8:00am – 1:00pm", returned: "Apr 19, 1:05pm", email: "jordankline22@gmail.com", phone: "(484) 555-0319", bookingId: "BK-20502" },
-  "pp7-barbados": { name: "Samir Patel", date: "Apr 19, 9:00am – 2:00pm", returned: "Apr 19, 2:03pm", email: "sampatel@outlook.com", phone: "(201) 555-0455", bookingId: "BK-20508" },
-  "sp3-antigua": { name: "Rachel Torres", date: "Apr 18, 10:00am – 3:00pm", returned: "Apr 18, 2:55pm", email: "rtorres.family@gmail.com", phone: "(973) 555-0612", bookingId: "BK-20477" },
+  "pp3-bermuda": { name: "Mike Caruso", date: "Jul 15, 10:00am – 3:00pm", returned: "Jul 15, 3:12pm", email: "mcaruso@gmail.com", phone: "(908) 555-0142", bookingId: "BK-20418" },
+  "sr3-gilgo": { name: "Dana & Tom Hewitt", date: "Jul 14, 8:00am – 1:00pm", returned: "Jul 14, 12:58pm", email: "dana.hewitt@yahoo.com", phone: "(570) 555-0287", bookingId: "BK-20391" },
+  "pp5-belize": { name: "Jordan Kline", date: "Jul 17, 8:00am – 1:00pm", returned: "Jul 17, 1:05pm", email: "jordankline22@gmail.com", phone: "(484) 555-0319", bookingId: "BK-20502" },
+  "pp7-barbados": { name: "Samir Patel", date: "Jul 17, 9:00am – 2:00pm", returned: "Jul 17, 2:03pm", email: "sampatel@outlook.com", phone: "(201) 555-0455", bookingId: "BK-20508" },
+  "sp3-antigua": { name: "Rachel Torres", date: "Jul 16, 10:00am – 3:00pm", returned: "Jul 16, 2:55pm", email: "rtorres.family@gmail.com", phone: "(973) 555-0612", bookingId: "BK-20477" },
 };
 
 // Expected return dates for calendar
 const expectedReturn: Record<string, { label: string; daysOut: number }> = {
-  "pp3-bermuda": { label: "May 3", daysOut: 13 },
-  "sr3-gilgo": { label: "Apr 23", daysOut: 3 },
-  "pp5-belize": { label: "Apr 21", daysOut: 1 },
-  "pp7-barbados": { label: "Apr 22", daysOut: 2 },
-  "sp3-antigua": { label: "Apr 25", daysOut: 5 },
+  "pp3-bermuda": { label: "Jul 31", daysOut: 13 },
+  "sr3-gilgo": { label: "Jul 21", daysOut: 3 },
+  "pp5-belize": { label: "Jul 19", daysOut: 1 },
+  "pp7-barbados": { label: "Jul 20", daysOut: 2 },
+  "sp3-antigua": { label: "Jul 23", daysOut: 5 },
 };
 
 function generateEmail(boat: Boat, hasReply: boolean): string {
@@ -353,7 +353,7 @@ export default function MaintenancePage() {
           <div className="px-6 py-4 border-b border-black/5">
             <h2 className="font-semibold text-sm text-black">
               Expected Return Timeline
-              <span className="ml-2 text-[10px] text-[#afafaf] font-normal">Apr 20 — May 10, 2026</span>
+              <span className="ml-2 text-[10px] text-[#afafaf] font-normal">Jul 18 — Aug 7, 2026</span>
             </h2>
           </div>
           <div className="px-6 py-4 overflow-x-auto">
@@ -854,7 +854,7 @@ function CalendarStrip({
   const DAY_W = 36;
 
   const labels = Array.from({ length: DAYS }, (_, i) => {
-    const d = new Date(2026, 3, 20 + i); // April 20 + i
+    const d = new Date(2026, 6, 18 + i); // July 18 + i
     return {
       day: d.getDate(),
       month: d.toLocaleDateString("en-US", { month: "short" }),

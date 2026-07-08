@@ -43,7 +43,7 @@ export default function ReservationsPage() {
   const nowLeft = `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${pctLeft(NOW_MIN) / 100})`;
 
   return (
-    <div className="px-8 py-6 max-w-[1440px]">
+    <div className="px-8 py-6 max-w-[1800px] mx-auto w-full">
       {/* Header */}
       <div className="flex items-end justify-between mb-6">
         <div>
@@ -201,7 +201,7 @@ function BoatRow({
         {!inService ? (
           <div
             className="absolute inset-1.5 rounded-md flex items-center px-3 text-[12px]"
-            style={{ background: sc.bg, border: `0.5px solid ${sc.border}`, color: sc.text }}
+            style={{ background: sc.bg, border: `1px solid ${sc.border}`, color: sc.text }}
           >
             {sc.label}
             {boat.maintenanceNote ? ` · ${boat.maintenanceNote.split(".")[0]}` : ""}
@@ -215,7 +215,7 @@ function BoatRow({
                 left: `${pctLeft(r.start)}%`,
                 width: `${pctWidth(r.duration)}%`,
                 background: teal.bg,
-                border: `0.5px solid ${teal.border}`,
+                border: `1px solid ${teal.border}`,
                 color: teal.text,
               }}
               title={`${r.renter} · ${fmtRange(r.start, r.start + r.duration)}`}
