@@ -11,7 +11,11 @@ export const metadata: Metadata = {
   description: "Fleet & Rental Management System",
 };
 
-const nav: { label: string; href: string }[] = [];
+const nav: { label: string; href: string }[] = [
+  { label: "Fleet", href: "/fleet" },
+  { label: "Maintenance", href: "/maintenance" },
+  { label: "Reservations", href: "/reservations" },
+];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -50,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             {/* Right: context */}
             <div className="flex items-center gap-3">
-              <span className="text-white/30 text-xs">Apr 20, 2026</span>
+              <span className="text-white/30 text-xs">Sat, Jul 18, 2026</span>
               <div className="w-7 h-7 rounded-full bg-[#5C9A9E] flex items-center justify-center text-white text-xs font-bold">
                 S
               </div>
