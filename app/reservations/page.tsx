@@ -63,11 +63,28 @@ type Slot = { boat: Boat; top: number; left: number };
 const EMPLOYEES = ["Tyler", "Nate", "Kenny", "Parker", "Zach", "Sam", "Dave", "Sue"];
 type Note = { id: number; text: string; who: string; done: boolean };
 const SEED_NOTES: Note[] = [
-  { id: 1, text: "Belize (PP5) prop damaged on yesterday's afternoon rental (Jul 17) — check the booking notes for details. Service is aware and pulling it today.", who: "Kenny", done: false },
-  { id: 2, text: "Moved today's Belize rental onto Curacao — today's covered.", who: "Kenny", done: true },
-  { id: 3, text: "Take Belize out of service in Fleet Management + block it on the calendar for the rest of the week (until it's back).", who: "Dave", done: false },
-  { id: 4, text: "Call Matt (service) for Belize's return-to-water date.", who: "Dave", done: false },
-  { id: 5, text: "Power-wash Curacao and Belize before the afternoon rush.", who: "Kenny", done: false },
+  { id: 1, text: "Power-wash Curacao and Belize before the afternoon rush", who: "Kenny", done: false },
+  { id: 2, text: "Replace anchor line on Curacao", who: "Sam", done: false },
+  { id: 3, text: "Restock and refill life jackets", who: "Tyler", done: false },
+  { id: 4, text: "Full clean on the boats back from yesterday", who: "Kenny", done: false },
+];
+
+type HandledItem = { id: number; text: string; done: boolean };
+type Incident = { id: number; boat: string; title: string; date: string; summary: string; handled: HandledItem[]; next: string };
+const SEED_INCIDENTS: Incident[] = [
+  {
+    id: 1,
+    boat: "Belize · PP5",
+    title: "prop damage",
+    date: "Fri, Jul 17",
+    summary: "Damaged on Friday's afternoon rental. Dave had it pulled that night — service is aware.",
+    handled: [
+      { id: 1, text: "Rentals Jul 18–20 moved to other boats", done: true },
+      { id: 2, text: "Blocked on the calendar through the week", done: true },
+      { id: 3, text: "Before/after photos taken — see booking notes", done: true },
+    ],
+    next: "Get repair estimate from Sue → call the customer",
+  },
 ];
 
 export default function ReservationsPage() {
@@ -77,6 +94,7 @@ export default function ReservationsPage() {
   const [booking, setBooking] = useState<Prefill | null>(null);
   const [confirmed, setConfirmed] = useState<Reservation | null>(null);
   const [, setTick] = useState(0);
+  const [incidents, setIncidents] = useState<Incident[]>(SEED_INCIDENTS);
   const [notes, setNotes] = useState<Note[]>(SEED_NOTES);
   const [noteText, setNoteText] = useState("");
   const [noteWho, setNoteWho] = useState(EMPLOYEES[0]);
@@ -162,7 +180,7 @@ export default function ReservationsPage() {
 
       {/* Notes | Dispatch strip (above the grid) */}
       <div className="grid grid-cols-2 gap-4 mb-5">
-        <NotesPanel notes={notes} onToggle={toggleNote} onDelete={deleteNote} onAdd={addNote} text={noteText} setText={setNoteText} who={noteWho} setWho={setNoteWho} />
+        <NotesPanel incidents={incidents} setIncidents={setIncidents} notes={notes} onToggle={toggleNote} onDelete={deleteNote} onAdd={addNote} text={noteText} setText={setNoteText} who={noteWho} setWho={setNoteWho} />
         <DispatchPanel status={dispatchStatus} onCycle={cycleDispatch} />
       </div>
 
@@ -772,7 +790,61 @@ function CheckLine({ on, onClick, label }: { on: boolean; onClick: () => void; l
   );
 }
 
-function NotesPanel({ notes, onToggle, onDelete, onAdd, text, setText, who, setWho }: {
+const edCls = "bg-transparent rounded px-1 -mx-1 outline-none hover:bg-black/[0.03] focus:bg-white/70 focus:ring-1 focus:ring-[#e0b84a]";
+
+function HeadsUp({ incidents, setIncidents }: { incidents: Incident[]; setIncidents: React.Dispatch<React.SetStateAction<Incident[]>> }) {
+  const upd = (id: number, p: Partial<Incident>) => setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, ...p } : x)));
+  const updH = (id: number, itemId: number, p: Partial<HandledItem>) => setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, handled: x.handled.map((h) => (h.id === itemId ? { ...h, ...p } : h)) } : x)));
+  const addH = (id: number) => setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, handled: [...x.handled, { id: Date.now(), text: "", done: true }] } : x)));
+  const removeH = (id: number, itemId: number) => setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, handled: x.handled.filter((h) => h.id !== itemId) } : x)));
+  const dismiss = (id: number) => setIncidents((xs) => xs.filter((x) => x.id !== id));
+  const add = () => setIncidents((xs) => [...xs, { id: Date.now(), boat: "", title: "", date: "", summary: "", handled: [], next: "" }]);
+
+  return (
+    <div className="px-4 pt-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[11px] font-medium text-[#afafaf]">Heads up · from last night</p>
+        <button onClick={add} className="text-[11px] font-medium text-[#5C9A9E] hover:text-[#0F6E56]">+ Add</button>
+      </div>
+      {incidents.length === 0 ? (
+        <p className="text-[12px] text-[#c9ccd2] italic pb-1">Nothing flagged.</p>
+      ) : (
+        incidents.map((inc) => (
+          <div key={inc.id} className="rounded-[10px] p-3 mb-2" style={{ background: "#fef3c7", border: "1px solid #fcd34d" }}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.48 14.7A1 1 0 002.67 20h18.66a1 1 0 00.86-1.44l-8.48-14.7a1 1 0 00-1.72 0z" /></svg>
+              <input value={inc.boat} onChange={(e) => upd(inc.id, { boat: e.target.value })} placeholder="Boat" className={`text-[13px] font-semibold text-[#78350f] w-32 ${edCls}`} />
+              <input value={inc.title} onChange={(e) => upd(inc.id, { title: e.target.value })} placeholder="what happened" className={`text-[12px] text-[#92600f] flex-1 min-w-0 ${edCls}`} />
+              <input value={inc.date} onChange={(e) => upd(inc.id, { date: e.target.value })} placeholder="date" className={`text-[11px] text-[#b07d1a] w-24 text-right ${edCls}`} />
+              <button onClick={() => dismiss(inc.id)} title="Dismiss" className="text-[#d4a72c] hover:text-[#b23b3b] text-base leading-none flex-shrink-0">×</button>
+            </div>
+            <textarea value={inc.summary} onChange={(e) => upd(inc.id, { summary: e.target.value })} rows={2} placeholder="What happened…" className={`text-[13px] text-[#5a4300] w-full resize-none leading-snug mb-2 ${edCls}`} />
+            <div className="flex flex-col gap-1 mb-2">
+              {inc.handled.map((h) => (
+                <div key={h.id} className="group/h flex items-center gap-1.5">
+                  <button onClick={() => updH(inc.id, h.id, { done: !h.done })} className="w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: h.done ? "#10b981" : "transparent", border: h.done ? "none" : "1px solid #d4a72c" }}>
+                    {h.done && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                  </button>
+                  <input value={h.text} onChange={(e) => updH(inc.id, h.id, { text: e.target.value })} placeholder="handled item" className={`text-[12px] text-[#6b5320] flex-1 min-w-0 ${edCls}`} />
+                  <button onClick={() => removeH(inc.id, h.id)} className="opacity-0 group-hover/h:opacity-100 text-[#d4a72c] hover:text-[#b23b3b] text-sm leading-none flex-shrink-0 transition-opacity">×</button>
+                </div>
+              ))}
+              <button onClick={() => addH(inc.id)} className="text-[11px] text-[#b07d1a] hover:text-[#78350f] self-start ml-5">+ handled item</button>
+            </div>
+            <div className="flex items-center gap-1.5 pt-2 border-t border-[#fcd34d]">
+              <span className="text-[12px] font-semibold text-[#78350f] flex-shrink-0">Next:</span>
+              <input value={inc.next} onChange={(e) => upd(inc.id, { next: e.target.value })} placeholder="follow-up…" className={`text-[12px] text-[#78350f] flex-1 min-w-0 ${edCls}`} />
+              <span className="text-[11px] text-[#5C9A9E] whitespace-nowrap flex-shrink-0 cursor-pointer">View booking →</span>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function NotesPanel({ incidents, setIncidents, notes, onToggle, onDelete, onAdd, text, setText, who, setWho }: {
+  incidents: Incident[]; setIncidents: React.Dispatch<React.SetStateAction<Incident[]>>;
   notes: Note[]; onToggle: (id: number) => void; onDelete: (id: number) => void; onAdd: () => void;
   text: string; setText: (v: string) => void; who: string; setWho: (v: string) => void;
 }) {
@@ -782,22 +854,26 @@ function NotesPanel({ notes, onToggle, onDelete, onAdd, text, setText, who, setW
         <span className="text-[13px] font-semibold text-black">Notes &amp; to-dos</span>
         <span className="text-[11px] text-[#afafaf]">ongoing</span>
       </div>
-      <div className="flex-1 overflow-y-auto max-h-[300px] px-4 py-1">
-        {notes.map((n) => (
-          <div key={n.id} className="group flex items-start gap-2.5 py-2 border-b border-black/5 last:border-0">
-            <button onClick={() => onToggle(n.id)} className="mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border" style={{ background: n.done ? teal.border : "#fff", borderColor: n.done ? teal.border : "#cbd5e1" }}>
-              {n.done && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-            </button>
-            <p className="flex-1 text-[13px] leading-snug">
-              <span className={n.done ? "text-[#afafaf] line-through" : "text-[#1a1a1a]"}>{n.text}</span>
-              <span className="text-[11px] text-[#5C9A9E] font-medium ml-1.5 whitespace-nowrap">— {n.who}</span>
-            </p>
-            <button onClick={() => onDelete(n.id)} className="opacity-0 group-hover:opacity-100 text-[#c9ccd2] hover:text-[#e05252] text-base leading-none flex-shrink-0 transition-opacity" title="Delete note" aria-label="Delete note">×</button>
-          </div>
-        ))}
+      <div className="flex-1 overflow-y-auto max-h-[460px]">
+        <HeadsUp incidents={incidents} setIncidents={setIncidents} />
+        <div className="px-4 pt-3 pb-1">
+          <p className="text-[11px] font-medium text-[#afafaf] mb-1">To-dos</p>
+          {notes.map((n) => (
+            <div key={n.id} className="group flex items-start gap-2.5 py-2 border-b border-black/5 last:border-0">
+              <button onClick={() => onToggle(n.id)} className="mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border" style={{ background: n.done ? teal.border : "#fff", borderColor: n.done ? teal.border : "#cbd5e1" }}>
+                {n.done && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+              </button>
+              <p className="flex-1 text-[13px] leading-snug">
+                <span className={n.done ? "text-[#afafaf] line-through" : "text-[#1a1a1a]"}>{n.text}</span>
+                <span className="text-[11px] text-[#5C9A9E] font-medium ml-1.5 whitespace-nowrap">— {n.who}</span>
+              </p>
+              <button onClick={() => onDelete(n.id)} className="opacity-0 group-hover:opacity-100 text-[#c9ccd2] hover:text-[#e05252] text-base leading-none flex-shrink-0 transition-opacity" title="Delete note" aria-label="Delete note">×</button>
+            </div>
+          ))}
+        </div>
       </div>
       <div className="flex items-center gap-2 px-4 py-2.5 border-t border-black/5">
-        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onAdd(); }} placeholder="Add a note or to-do…" className="flex-1 text-[13px] border border-black/15 rounded-lg px-2.5 py-1.5" />
+        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onAdd(); }} placeholder="Add a to-do…" className="flex-1 text-[13px] border border-black/15 rounded-lg px-2.5 py-1.5" />
         <select value={who} onChange={(e) => setWho(e.target.value)} className="text-[12px] border border-black/15 rounded-lg px-2 py-1.5 bg-white">
           {EMPLOYEES.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
@@ -825,17 +901,17 @@ function DispatchPanel({ status, onCycle }: { status: Record<string, number>; on
             <button
               key={r.id}
               onClick={() => onCycle(r.id)}
-              className="w-full text-left flex items-center gap-2.5 px-4 py-2 border-b border-black/5 last:border-0 hover:bg-[#fafafa]"
+              className="w-full text-left flex items-center gap-3 px-4 py-2 border-b border-black/5 last:border-0 hover:bg-[#fafafa]"
               style={{ background: st === 2 ? "#eaf6ef" : undefined }}
               title="Click: out on the water → back / done → reset"
             >
-              <span className="w-28 flex-shrink-0 text-[12px] truncate">
+              <span className="w-[118px] flex-shrink-0 text-[12px] truncate">
                 <span className={`font-mono font-semibold ${st === 1 ? "text-[#afafaf]" : "text-[#5C9A9E]"}`}>{boat?.code || "—"}</span>
                 <span className={`ml-1.5 ${st === 1 ? dim : "text-[#1a1a1a]"}`}>{boat?.name}</span>
               </span>
-              <span className={`flex-1 truncate text-[13px] font-medium ${st === 1 ? dim : st === 2 ? "text-[#0F6E56]" : "text-[#1a1a1a]"}`}>{r.renter}</span>
-              <span className={`text-[12px] tabular-nums flex-shrink-0 ${st === 1 ? dim : "text-[#6b6b6b]"}`}>{fmtRange(r.start, resEnd(r))}</span>
-              {acc.length > 0 && <span className="text-[11px] text-[#afafaf] flex-shrink-0 max-w-[120px] truncate">{acc.join(", ")}</span>}
+              <span className={`w-[104px] flex-shrink-0 text-[12px] tabular-nums ${st === 1 ? dim : "text-[#6b6b6b]"}`}>{fmtRange(r.start, resEnd(r))}</span>
+              <span className={`text-[13px] font-medium flex-shrink-0 ${st === 1 ? dim : st === 2 ? "text-[#0F6E56]" : "text-[#1a1a1a]"}`}>{r.renter}</span>
+              {acc.length > 0 && <span className={`text-[11px] flex-shrink-0 ${st === 1 ? "text-[#afafaf] line-through" : "text-[#9aa0a6]"}`}>· {acc.join(", ")}</span>}
             </button>
           );
         })}
