@@ -63,10 +63,11 @@ type Slot = { boat: Boat; top: number; left: number };
 const EMPLOYEES = ["Tyler", "Nate", "Kenny", "Parker", "Zach", "Sam", "Dave", "Sue"];
 type Note = { id: number; text: string; who: string; done: boolean };
 const SEED_NOTES: Note[] = [
-  { id: 1, text: "Power-wash the 2 boats that came back before the afternoon rush", who: "Kenny", done: false },
-  { id: 2, text: "Belize prop damage settled + contacted service (see yesterday's PM Belize rental)", who: "Kenny", done: true },
-  { id: 3, text: "Contact Matt re: Bermuda prop ETA", who: "Dave", done: false },
-  { id: 4, text: "Replace anchor line on Curacao next week", who: "Sam", done: false },
+  { id: 1, text: "Belize (PP5) prop damaged on yesterday's afternoon rental (Jul 17) — check the booking notes for details. Service is aware and pulling it today.", who: "Kenny", done: false },
+  { id: 2, text: "Moved today's Belize rental onto Curacao — today's covered.", who: "Kenny", done: true },
+  { id: 3, text: "Take Belize out of service in Fleet Management + block it on the calendar for the rest of the week (until it's back).", who: "Dave", done: false },
+  { id: 4, text: "Call Matt (service) for Belize's return-to-water date.", who: "Dave", done: false },
+  { id: 5, text: "Power-wash Curacao and Belize before the afternoon rush.", who: "Kenny", done: false },
 ];
 
 export default function ReservationsPage() {
@@ -88,6 +89,7 @@ export default function ReservationsPage() {
     setNoteText("");
   };
   const toggleNote = (id: number) => setNotes((ns) => ns.map((n) => (n.id === id ? { ...n, done: !n.done } : n)));
+  const deleteNote = (id: number) => setNotes((ns) => ns.filter((n) => n.id !== id));
   const cycleDispatch = (id: string) => setDispatchStatus((s) => ({ ...s, [id]: ((s[id] || 0) + 1) % 3 }));
 
   // Recomputed each render off the live (mutable) reservations array.
@@ -113,46 +115,46 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      {/* Headline — Option A: day-shape caption + hero (on the water) + detail */}
-      <div className="mb-5 inline-flex flex-col bg-white rounded-xl px-5 py-4 shadow-[rgba(0,0,0,0.08)_0px_4px_16px]">
-        <p className="text-[13px] text-[#6b6b6b] mb-3">
-          <span className="font-semibold text-black tabular-nums">{live.reservationsToday}</span> reservations today
-          <span className="text-[#d4d4d4] mx-2">·</span>
-          <span className="font-semibold text-black tabular-nums">{live.turnovers}</span> turnovers
-        </p>
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col">
-            <span className="text-[44px] font-bold leading-none tabular-nums" style={{ color: stageConfig["on-water"].text }}>{live.onWater}</span>
-            <span className="text-[13px] text-[#6b6b6b] mt-1.5">on the water</span>
+      {/* Top bar: day summary (left) + typical-slots toggle (right) — one full-width bar */}
+      <div className="mb-5 bg-white rounded-xl px-5 py-4 shadow-[rgba(0,0,0,0.08)_0px_4px_16px]">
+        <div className="flex items-start justify-between gap-6 flex-wrap">
+          <div>
+            <p className="text-[13px] text-[#6b6b6b] mb-3">
+              <span className="font-semibold text-black tabular-nums">{live.reservationsToday}</span> reservations today
+              <span className="text-[#d4d4d4] mx-2">·</span>
+              <span className="font-semibold text-black tabular-nums">{live.turnovers}</span> turnovers
+            </p>
+            <div className="flex items-center gap-6">
+              <div className="flex flex-col">
+                <span className="text-[44px] font-bold leading-none tabular-nums" style={{ color: stageConfig["on-water"].text }}>{live.onWater}</span>
+                <span className="text-[13px] text-[#6b6b6b] mt-1.5">on the water</span>
+              </div>
+              <div className="self-stretch w-px bg-black/10" />
+              <div className="flex flex-col gap-2.5">
+                <span className="text-[14px] text-[#1a1a1a] flex items-center">
+                  <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: "#94a3b8" }} />
+                  <span className="font-semibold tabular-nums mr-1">{live.toGoOut}</span> to go out
+                </span>
+                <span className="text-[14px] text-[#1a1a1a] flex items-center">
+                  <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: stageConfig.returned.dot }} />
+                  <span className="font-semibold tabular-nums mr-1">{live.toFinalize}</span> to finalize
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="self-stretch w-px bg-black/10" />
-          <div className="flex flex-col gap-2.5">
-            <span className="text-[14px] text-[#1a1a1a] flex items-center">
-              <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: "#94a3b8" }} />
-              <span className="font-semibold tabular-nums mr-1">{live.toGoOut}</span> to go out
-            </span>
-            <span className="text-[14px] text-[#1a1a1a] flex items-center">
-              <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: stageConfig.returned.dot }} />
-              <span className="font-semibold tabular-nums mr-1">{live.toFinalize}</span> to finalize
-            </span>
-          </div>
+          <button
+            onClick={() => setCardOpen((v) => !v)}
+            className="flex items-center gap-2 text-sm font-semibold text-black hover:text-[#0F6E56] transition-colors self-start"
+          >
+            <svg className={`w-3.5 h-3.5 text-[#5C9A9E] transition-transform ${cardOpen ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            Typical time slots
+            <span className="text-[11px] font-normal text-[#afafaf]">reference</span>
+          </button>
         </div>
-      </div>
-
-      {/* Typical time-slots reference card (redesigned compact) */}
-      <div className="mb-5">
-        <button
-          onClick={() => setCardOpen((v) => !v)}
-          className="flex items-center gap-2 bg-white rounded-xl px-4 py-2.5 shadow-[rgba(0,0,0,0.08)_0px_4px_16px] text-sm font-semibold text-black hover:bg-[#fafafa] transition-colors"
-        >
-          <svg className={`w-3.5 h-3.5 text-[#5C9A9E] transition-transform ${cardOpen ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-          Typical time slots
-          <span className="text-[11px] font-normal text-[#afafaf]">reference · same for every boat type</span>
-        </button>
         {cardOpen && (
-          <div className="mt-2">
+          <div className="mt-4 pt-4 border-t border-black/5">
             <TypicalSlots />
           </div>
         )}
@@ -160,7 +162,7 @@ export default function ReservationsPage() {
 
       {/* Notes | Dispatch strip (above the grid) */}
       <div className="grid grid-cols-2 gap-4 mb-5">
-        <NotesPanel notes={notes} onToggle={toggleNote} onAdd={addNote} text={noteText} setText={setNoteText} who={noteWho} setWho={setNoteWho} />
+        <NotesPanel notes={notes} onToggle={toggleNote} onDelete={deleteNote} onAdd={addNote} text={noteText} setText={setNoteText} who={noteWho} setWho={setNoteWho} />
         <DispatchPanel status={dispatchStatus} onCycle={cycleDispatch} />
       </div>
 
@@ -770,8 +772,8 @@ function CheckLine({ on, onClick, label }: { on: boolean; onClick: () => void; l
   );
 }
 
-function NotesPanel({ notes, onToggle, onAdd, text, setText, who, setWho }: {
-  notes: Note[]; onToggle: (id: number) => void; onAdd: () => void;
+function NotesPanel({ notes, onToggle, onDelete, onAdd, text, setText, who, setWho }: {
+  notes: Note[]; onToggle: (id: number) => void; onDelete: (id: number) => void; onAdd: () => void;
   text: string; setText: (v: string) => void; who: string; setWho: (v: string) => void;
 }) {
   return (
@@ -782,7 +784,7 @@ function NotesPanel({ notes, onToggle, onAdd, text, setText, who, setWho }: {
       </div>
       <div className="flex-1 overflow-y-auto max-h-[300px] px-4 py-1">
         {notes.map((n) => (
-          <div key={n.id} className="flex items-start gap-2.5 py-2 border-b border-black/5 last:border-0">
+          <div key={n.id} className="group flex items-start gap-2.5 py-2 border-b border-black/5 last:border-0">
             <button onClick={() => onToggle(n.id)} className="mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border" style={{ background: n.done ? teal.border : "#fff", borderColor: n.done ? teal.border : "#cbd5e1" }}>
               {n.done && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
             </button>
@@ -790,6 +792,7 @@ function NotesPanel({ notes, onToggle, onAdd, text, setText, who, setWho }: {
               <span className={n.done ? "text-[#afafaf] line-through" : "text-[#1a1a1a]"}>{n.text}</span>
               <span className="text-[11px] text-[#5C9A9E] font-medium ml-1.5 whitespace-nowrap">— {n.who}</span>
             </p>
+            <button onClick={() => onDelete(n.id)} className="opacity-0 group-hover:opacity-100 text-[#c9ccd2] hover:text-[#e05252] text-base leading-none flex-shrink-0 transition-opacity" title="Delete note" aria-label="Delete note">×</button>
           </div>
         ))}
       </div>
@@ -810,7 +813,7 @@ function DispatchPanel({ status, onCycle }: { status: Record<string, number>; on
     <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
         <span className="text-[13px] font-semibold text-black">Today&apos;s dispatch <span className="text-[11px] font-normal text-[#afafaf]">· {rows.length} going out</span></span>
-        <button onClick={() => window.print()} className="text-[12px] font-medium text-[#0F6E56] border border-[#5DCAA5] rounded-full px-3 py-1 hover:bg-[#e1f5ee]">Print / Send</button>
+        <button disabled title="Prints / sends the crew sheet to the dock (disabled in the demo)" className="text-[12px] font-medium text-[#9aa0a6] border border-black/10 rounded-full px-3 py-1 cursor-default">Print / Send</button>
       </div>
       <div className="flex-1 overflow-y-auto max-h-[300px]">
         {rows.map((r) => {
@@ -832,7 +835,7 @@ function DispatchPanel({ status, onCycle }: { status: Record<string, number>; on
               </span>
               <span className={`flex-1 truncate text-[13px] font-medium ${st === 1 ? dim : st === 2 ? "text-[#0F6E56]" : "text-[#1a1a1a]"}`}>{r.renter}</span>
               <span className={`text-[12px] tabular-nums flex-shrink-0 ${st === 1 ? dim : "text-[#6b6b6b]"}`}>{fmtRange(r.start, resEnd(r))}</span>
-              {acc.length > 0 && <span className="text-[11px] text-[#afafaf] flex-shrink-0 max-w-[110px] truncate hidden lg:inline">{acc.join(", ")}</span>}
+              {acc.length > 0 && <span className="text-[11px] text-[#afafaf] flex-shrink-0 max-w-[120px] truncate">{acc.join(", ")}</span>}
             </button>
           );
         })}

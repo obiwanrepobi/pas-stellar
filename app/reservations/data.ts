@@ -108,16 +108,16 @@ const m = (h: number, min = 0) => h * 60 + min;
 // ─── Mock reservations for the demo day ───────────────────────────────────────
 export const reservations: Reservation[] = [
   // Premium Pontoon
-  { id: "R-8801", boatId: "pp1-tortola", category: "Premium Pontoon", start: m(8), duration: FULL_MIN, renter: "Mike Caruso" },
+  { id: "R-8801", boatId: "pp1-tortola", category: "Premium Pontoon", start: m(8), duration: FULL_MIN, renter: "Mike Caruso", accessories: ["single-tube", "water-mat"] },
   { id: "R-8802", boatId: "pp2-jamaica", category: "Premium Pontoon", start: m(8, 30), duration: HALF_MIN, renter: "Dana Hewitt", stage: "finalized" },
   { id: "R-8803", boatId: "pp2-jamaica", category: "Premium Pontoon", start: m(14, 30), duration: HALF_MIN, renter: "Samir Patel", stage: "queued" },
-  { id: "R-8804", boatId: "pp4-curacao", category: "Premium Pontoon", start: m(9), duration: FULL_MIN, renter: "Alyssa Reed" },
+  { id: "R-8804", boatId: "pp4-curacao", category: "Premium Pontoon", start: m(9), duration: FULL_MIN, renter: "Alyssa Reed", accessories: ["double-tube", "kneeboard"] },
   { id: "R-8805", boatId: "pp6-bahamas", category: "Premium Pontoon", start: m(9, 15), duration: HALF_MIN, renter: "Greg Lin" },
   { id: "R-8806", boatId: "pp6-bahamas", category: "Premium Pontoon", start: m(15), duration: HALF_MIN, renter: "Nina Osei" },
   { id: "R-8807", boatId: "pp10-belle", category: "Premium Pontoon", start: m(8, 30), duration: FULL_MIN, renter: "Priya Shah" },
 
   // Premium Slide Pontoon
-  { id: "R-8810", boatId: "psp1-breaksea", category: "Premium Slide Pontoon", start: m(10), duration: FULL_MIN, renter: "Marcus Delgado" },
+  { id: "R-8810", boatId: "psp1-breaksea", category: "Premium Slide Pontoon", start: m(10), duration: FULL_MIN, renter: "Marcus Delgado", accessories: ["single-tube"] },
 
   // Standard Slide Pontoon
   { id: "R-8815", boatId: "s1-grand-turk", category: "Standard Slide Pontoon", start: m(8, 15), duration: HALF_MIN, renter: "Kayla Brooks", stage: "finalized" },
@@ -127,12 +127,12 @@ export const reservations: Reservation[] = [
   // Standard Pontoon
   { id: "R-8820", boatId: "sp1-kitts", category: "Standard Pontoon", start: m(9, 15), duration: HALF_MIN, renter: "Rachel Torres" },
   { id: "R-8821", boatId: "sp2-caicos", category: "Standard Pontoon", start: m(11), duration: HALF_MIN, renter: "Dev Anand" },
-  { id: "R-8822", boatId: "sp4-costa-rica", category: "Standard Pontoon", start: m(8), duration: FULL_MIN, renter: "Ed Kowalski" },
+  { id: "R-8822", boatId: "sp4-costa-rica", category: "Standard Pontoon", start: m(8), duration: FULL_MIN, renter: "Ed Kowalski", accessories: ["single-tube"] },
   { id: "R-8823", boatId: "sp5-tortuga", category: "Standard Pontoon", start: m(8), duration: HALF_MIN, renter: "Liam Fox", stage: "finalized" },
   { id: "R-8824", boatId: "sp5-tortuga", category: "Standard Pontoon", start: m(12, 30), duration: HALF_MIN, renter: "Kim Nguyen" },
 
   // Standard Runabout
-  { id: "R-8830", boatId: "sr1-atlantique", category: "Standard Runabout", start: m(10), duration: FULL_MIN, renter: "Jordan Kline" },
+  { id: "R-8830", boatId: "sr1-atlantique", category: "Standard Runabout", start: m(10), duration: FULL_MIN, renter: "Jordan Kline", accessories: ["double-tube", "kneeboard"] },
   { id: "R-8831", boatId: "sr2-montauk", category: "Standard Runabout", start: m(8, 45), duration: HALF_MIN, renter: "Chris Vogel" },
   { id: "R-8832", boatId: "sr2-montauk", category: "Standard Runabout", start: m(14), duration: HALF_MIN, renter: "Tara Quinn", stage: "queued" },
 
