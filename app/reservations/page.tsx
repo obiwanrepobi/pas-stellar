@@ -891,7 +891,7 @@ function DispatchPanel({ status, onCycle }: { status: Record<string, number>; on
         <span className="text-[13px] font-semibold text-black">Today&apos;s dispatch <span className="text-[11px] font-normal text-[#afafaf]">· {rows.length} going out</span></span>
         <button disabled title="Prints / sends the crew sheet to the dock (disabled in the demo)" className="text-[12px] font-medium text-[#9aa0a6] border border-black/10 rounded-full px-3 py-1 cursor-default">Print / Send</button>
       </div>
-      <div className="flex-1 overflow-y-auto max-h-[300px]">
+      <div className="flex-1 overflow-y-auto">
         {rows.map((r) => {
           const boat = boatById(r.boatId);
           const st = status[r.id] || 0;
