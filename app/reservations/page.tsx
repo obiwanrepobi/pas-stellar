@@ -8,7 +8,7 @@ import {
   rentalFleetByCategory,
   boatOpenWindows,
   typicalWindows,
-  dayCounts,
+  liveCounts,
   turnoverBoatIds,
   fmt,
   fmtRange,
@@ -69,7 +69,7 @@ export default function ReservationsPage() {
   const [, setTick] = useState(0);
 
   // Recomputed each render off the live (mutable) reservations array.
-  const counts = dayCounts();
+  const live = liveCounts();
   const turnovers = turnoverBoatIds();
 
   const nowLeft = `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${pctLeft(NOW_MIN) / 100})`;
@@ -91,11 +91,22 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      {/* Counts */}
-      <div className="flex gap-3 mb-4">
-        <Count label="Out today" value={counts.outToday} />
-        <Count label="Still to come back" value={counts.stillOut} color="#10b981" />
-        <Count label="Turnovers" value={counts.turnovers} color="#f59e0b" />
+      {/* Day snapshot (the plan) + live state (right now) */}
+      <div className="mb-5">
+        <p className="text-[13px] text-[#6b6b6b] mb-2">
+          <span className="font-bold text-black tabular-nums">{live.reservationsToday}</span> reservations today
+          <span className="text-[#cbd5e1] mx-2">·</span>
+          <span className="font-bold text-black tabular-nums">{live.turnovers}</span> turnovers
+        </p>
+        <div className="inline-flex flex-col bg-white rounded-xl px-5 py-3.5 shadow-[rgba(0,0,0,0.08)_0px_4px_16px]">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[34px] font-bold leading-none tabular-nums" style={{ color: stageConfig["on-water"].text }}>{live.onWater}</span>
+            <span className="text-sm font-semibold text-[#4b4b4b]">on the water</span>
+          </div>
+          <p className="text-[12px] text-[#afafaf] mt-1.5 tabular-nums">
+            {live.toGoOut} to go out · {live.toFinalize} to finalize
+          </p>
+        </div>
       </div>
 
       {/* Typical time-slots reference card (redesigned compact) */}
@@ -144,15 +155,6 @@ export default function ReservationsPage() {
         <BookingScreen prefill={booking} onClose={() => setBooking(null)} onBook={(res) => { setTick((t) => t + 1); setBooking(null); setConfirmed(res); }} />
       )}
       {confirmed && <Confirmation res={confirmed} onDone={() => setConfirmed(null)} />}
-    </div>
-  );
-}
-
-function Count({ label, value, color }: { label: string; value: number; color?: string }) {
-  return (
-    <div className="bg-white rounded-xl px-4 py-3 shadow-[rgba(0,0,0,0.08)_0px_4px_16px] min-w-[130px]">
-      <p className="text-[11px] font-semibold text-[#afafaf] uppercase tracking-widest mb-1">{label}</p>
-      <span className="text-2xl font-bold leading-none" style={{ color: color ?? "#000" }}>{value}</span>
     </div>
   );
 }

@@ -188,6 +188,22 @@ export const turnoverBoatIds = (): Set<string> => {
   return new Set(Object.keys(perBoat).filter((id) => perBoat[id] >= 2));
 };
 
+// Live headline metrics. Day shape (reservationsToday, turnovers) is the plan;
+// the rest move through the day as stages change.
+export function liveCounts() {
+  const perBoat: Record<string, number> = {};
+  reservations.forEach((r) => { perBoat[r.boatId] = (perBoat[r.boatId] || 0) + 1; });
+  const turnovers = Object.values(perBoat).filter((n) => n >= 2).length;
+  let toGoOut = 0, onWater = 0, toFinalize = 0;
+  reservations.forEach((r) => {
+    const s = stageOf(r);
+    if (s === "reserved" || s === "queued") toGoOut++;
+    else if (s === "on-water") onWater++;
+    else if (s === "returned") toFinalize++;
+  });
+  return { reservationsToday: reservations.length, turnovers, toGoOut, onWater, toFinalize };
+}
+
 // Rentable fleet grouped by category (in display order), including OOS/flagged
 // boats so they show greyed on the board.
 export function rentalFleetByCategory() {
