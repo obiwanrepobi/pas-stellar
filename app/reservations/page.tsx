@@ -60,6 +60,15 @@ const formatExp = (v: string) => { const d = digits(v).slice(0, 4); return d.len
 type Prefill = { category?: string; duration?: number; start?: number; boatId?: string };
 type Slot = { boat: Boat; top: number; left: number };
 
+const EMPLOYEES = ["Tyler", "Nate", "Kenny", "Parker", "Zach", "Sam", "Dave", "Sue"];
+type Note = { id: number; text: string; who: string; done: boolean };
+const SEED_NOTES: Note[] = [
+  { id: 1, text: "Power-wash the 2 boats that came back before the afternoon rush", who: "Kenny", done: false },
+  { id: 2, text: "Belize prop damage settled + contacted service (see yesterday's PM Belize rental)", who: "Kenny", done: true },
+  { id: 3, text: "Contact Matt re: Bermuda prop ETA", who: "Dave", done: false },
+  { id: 4, text: "Replace anchor line on Curacao next week", who: "Sam", done: false },
+];
+
 export default function ReservationsPage() {
   const [cardOpen, setCardOpen] = useState(false);
   const [slot, setSlot] = useState<Slot | null>(null);
@@ -67,6 +76,19 @@ export default function ReservationsPage() {
   const [booking, setBooking] = useState<Prefill | null>(null);
   const [confirmed, setConfirmed] = useState<Reservation | null>(null);
   const [, setTick] = useState(0);
+  const [notes, setNotes] = useState<Note[]>(SEED_NOTES);
+  const [noteText, setNoteText] = useState("");
+  const [noteWho, setNoteWho] = useState(EMPLOYEES[0]);
+  const [dispatchStatus, setDispatchStatus] = useState<Record<string, number>>({});
+
+  const addNote = () => {
+    const t = noteText.trim();
+    if (!t) return;
+    setNotes((ns) => [...ns, { id: Date.now(), text: t, who: noteWho, done: false }]);
+    setNoteText("");
+  };
+  const toggleNote = (id: number) => setNotes((ns) => ns.map((n) => (n.id === id ? { ...n, done: !n.done } : n)));
+  const cycleDispatch = (id: string) => setDispatchStatus((s) => ({ ...s, [id]: ((s[id] || 0) + 1) % 3 }));
 
   // Recomputed each render off the live (mutable) reservations array.
   const live = liveCounts();
@@ -134,6 +156,12 @@ export default function ReservationsPage() {
             <TypicalSlots />
           </div>
         )}
+      </div>
+
+      {/* Notes | Dispatch strip (above the grid) */}
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        <NotesPanel notes={notes} onToggle={toggleNote} onAdd={addNote} text={noteText} setText={setNoteText} who={noteWho} setWho={setNoteWho} />
+        <DispatchPanel status={dispatchStatus} onCycle={cycleDispatch} />
       </div>
 
       {/* Board */}
@@ -739,6 +767,77 @@ function CheckLine({ on, onClick, label }: { on: boolean; onClick: () => void; l
       </span>
       <span className={`text-[12px] ${on ? "text-[#2A5B7D] line-through opacity-70" : "text-[#2A5B7D]"}`}>{label}</span>
     </button>
+  );
+}
+
+function NotesPanel({ notes, onToggle, onAdd, text, setText, who, setWho }: {
+  notes: Note[]; onToggle: (id: number) => void; onAdd: () => void;
+  text: string; setText: (v: string) => void; who: string; setWho: (v: string) => void;
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
+        <span className="text-[13px] font-semibold text-black">Notes &amp; to-dos</span>
+        <span className="text-[11px] text-[#afafaf]">ongoing</span>
+      </div>
+      <div className="flex-1 overflow-y-auto max-h-[300px] px-4 py-1">
+        {notes.map((n) => (
+          <div key={n.id} className="flex items-start gap-2.5 py-2 border-b border-black/5 last:border-0">
+            <button onClick={() => onToggle(n.id)} className="mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border" style={{ background: n.done ? teal.border : "#fff", borderColor: n.done ? teal.border : "#cbd5e1" }}>
+              {n.done && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+            </button>
+            <p className="flex-1 text-[13px] leading-snug">
+              <span className={n.done ? "text-[#afafaf] line-through" : "text-[#1a1a1a]"}>{n.text}</span>
+              <span className="text-[11px] text-[#5C9A9E] font-medium ml-1.5 whitespace-nowrap">— {n.who}</span>
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 px-4 py-2.5 border-t border-black/5">
+        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onAdd(); }} placeholder="Add a note or to-do…" className="flex-1 text-[13px] border border-black/15 rounded-lg px-2.5 py-1.5" />
+        <select value={who} onChange={(e) => setWho(e.target.value)} className="text-[12px] border border-black/15 rounded-lg px-2 py-1.5 bg-white">
+          {EMPLOYEES.map((e) => <option key={e} value={e}>{e}</option>)}
+        </select>
+        <button onClick={onAdd} className="text-[13px] font-medium text-white bg-black rounded-full px-3.5 py-1.5 hover:bg-[#1a1a1a]">Add</button>
+      </div>
+    </div>
+  );
+}
+
+function DispatchPanel({ status, onCycle }: { status: Record<string, number>; onCycle: (id: string) => void }) {
+  const rows = [...reservations].sort((a, b) => a.start - b.start);
+  return (
+    <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
+        <span className="text-[13px] font-semibold text-black">Today&apos;s dispatch <span className="text-[11px] font-normal text-[#afafaf]">· {rows.length} going out</span></span>
+        <button onClick={() => window.print()} className="text-[12px] font-medium text-[#0F6E56] border border-[#5DCAA5] rounded-full px-3 py-1 hover:bg-[#e1f5ee]">Print / Send</button>
+      </div>
+      <div className="flex-1 overflow-y-auto max-h-[300px]">
+        {rows.map((r) => {
+          const boat = boatById(r.boatId);
+          const st = status[r.id] || 0;
+          const dim = st === 1 ? "line-through text-[#afafaf]" : "";
+          const acc = (r.accessories ?? []).map((k) => accessoriesForBoat(boat).find((a) => a.key === k)?.label).filter(Boolean);
+          return (
+            <button
+              key={r.id}
+              onClick={() => onCycle(r.id)}
+              className="w-full text-left flex items-center gap-2.5 px-4 py-2 border-b border-black/5 last:border-0 hover:bg-[#fafafa]"
+              style={{ background: st === 2 ? "#eaf6ef" : undefined }}
+              title="Click: out on the water → back / done → reset"
+            >
+              <span className="w-28 flex-shrink-0 text-[12px] truncate">
+                <span className={`font-mono font-semibold ${st === 1 ? "text-[#afafaf]" : "text-[#5C9A9E]"}`}>{boat?.code || "—"}</span>
+                <span className={`ml-1.5 ${st === 1 ? dim : "text-[#1a1a1a]"}`}>{boat?.name}</span>
+              </span>
+              <span className={`flex-1 truncate text-[13px] font-medium ${st === 1 ? dim : st === 2 ? "text-[#0F6E56]" : "text-[#1a1a1a]"}`}>{r.renter}</span>
+              <span className={`text-[12px] tabular-nums flex-shrink-0 ${st === 1 ? dim : "text-[#6b6b6b]"}`}>{fmtRange(r.start, resEnd(r))}</span>
+              {acc.length > 0 && <span className="text-[11px] text-[#afafaf] flex-shrink-0 max-w-[110px] truncate hidden lg:inline">{acc.join(", ")}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

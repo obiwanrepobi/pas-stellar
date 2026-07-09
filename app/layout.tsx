@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 };
 
 const nav: { label: string; href: string }[] = [
+  { label: "Reservations", href: "/reservations" },
   { label: "Fleet", href: "/fleet" },
   { label: "Maintenance", href: "/maintenance" },
-  { label: "Reservations", href: "/reservations" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
