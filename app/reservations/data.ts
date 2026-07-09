@@ -57,24 +57,49 @@ export const RATES: Record<string, { half: number; full: number }> = {
 // ─── Reservation type ───────────────────────────────────────────────────────
 // Customer requests a CATEGORY; a specific hull is auto-slotted at booking time,
 // so every reservation carries a concrete boatId.
+// Rental lifecycle stages (drives the board block color). Colors chosen from
+// PAS's old system, with two collisions fixed: Reserved is NOT red (red = OOS
+// in this system), and Queued/Finalized no longer share purple.
+export type ReservationStage = "reserved" | "queued" | "on-water" | "returned" | "finalized";
+export const stageConfig: Record<
+  ReservationStage,
+  { label: string; bg: string; border: string; text: string; dot: string }
+> = {
+  reserved: { label: "Reserved", bg: "#eef1f5", border: "#cbd5e1", text: "#3f4b5b", dot: "#94a3b8" },
+  queued: { label: "Queued", bg: "#ede9fe", border: "#c4b5fd", text: "#5b21b6", dot: "#8b5cf6" },
+  "on-water": { label: "On the water", bg: "#dbeafe", border: "#93c5fd", text: "#1e3a8a", dot: "#3b82f6" },
+  returned: { label: "Returned", bg: "#d1fae5", border: "#6ee7b7", text: "#065f46", dot: "#10b981" },
+  finalized: { label: "Finalized", bg: "#047857", border: "#065f46", text: "#ffffff", dot: "#a7f3d0" },
+};
+
 export interface Reservation {
   id: string;
   boatId: string;
   category: string;
   start: number; // minutes from midnight
   duration: number; // HALF_MIN | FULL_MIN
-  renter: string; // captain / renter of record — ALWAYS one individual, never a party/family name
+  renter: string; // reservation name — ALWAYS one individual, never a party/family name
+  stage?: ReservationStage; // if absent, derived from time (see deriveStage)
   // Optional booking-screen fields (present on newly-created bookings)
   partySize?: number;
   booker?: string;
   phone?: string;
+  email?: string;
+  address?: string;
   captain?: string; // "TBD" allowed
   accessories?: string[]; // accessory keys
   damageWaiver?: boolean;
   cancellationInsurance?: boolean;
   total?: number; // tax-inclusive total charged at booking
+  cardName?: string;
+  cardLast4?: string;
 }
 export const resEnd = (r: Reservation) => r.start + r.duration;
+
+// If a reservation carries no explicit stage, derive one from the frozen "now":
+// upcoming → reserved, spanning now → on the water, past → returned.
+export const stageOf = (r: Reservation): ReservationStage =>
+  r.stage ?? (r.start > NOW_MIN ? "reserved" : resEnd(r) > NOW_MIN ? "on-water" : "returned");
 export const reservationsForBoat = (boatId: string) =>
   reservations.filter((r) => r.boatId === boatId);
 
@@ -84,8 +109,8 @@ const m = (h: number, min = 0) => h * 60 + min;
 export const reservations: Reservation[] = [
   // Premium Pontoon
   { id: "R-8801", boatId: "pp1-tortola", category: "Premium Pontoon", start: m(8), duration: FULL_MIN, renter: "Mike Caruso" },
-  { id: "R-8802", boatId: "pp2-jamaica", category: "Premium Pontoon", start: m(8, 30), duration: HALF_MIN, renter: "Dana Hewitt" },
-  { id: "R-8803", boatId: "pp2-jamaica", category: "Premium Pontoon", start: m(14, 30), duration: HALF_MIN, renter: "Samir Patel" },
+  { id: "R-8802", boatId: "pp2-jamaica", category: "Premium Pontoon", start: m(8, 30), duration: HALF_MIN, renter: "Dana Hewitt", stage: "finalized" },
+  { id: "R-8803", boatId: "pp2-jamaica", category: "Premium Pontoon", start: m(14, 30), duration: HALF_MIN, renter: "Samir Patel", stage: "queued" },
   { id: "R-8804", boatId: "pp4-curacao", category: "Premium Pontoon", start: m(9), duration: FULL_MIN, renter: "Alyssa Reed" },
   { id: "R-8805", boatId: "pp6-bahamas", category: "Premium Pontoon", start: m(9, 15), duration: HALF_MIN, renter: "Greg Lin" },
   { id: "R-8806", boatId: "pp6-bahamas", category: "Premium Pontoon", start: m(15), duration: HALF_MIN, renter: "Nina Osei" },
@@ -95,7 +120,7 @@ export const reservations: Reservation[] = [
   { id: "R-8810", boatId: "psp1-breaksea", category: "Premium Slide Pontoon", start: m(10), duration: FULL_MIN, renter: "Marcus Delgado" },
 
   // Standard Slide Pontoon
-  { id: "R-8815", boatId: "s1-grand-turk", category: "Standard Slide Pontoon", start: m(8, 15), duration: HALF_MIN, renter: "Kayla Brooks" },
+  { id: "R-8815", boatId: "s1-grand-turk", category: "Standard Slide Pontoon", start: m(8, 15), duration: HALF_MIN, renter: "Kayla Brooks", stage: "finalized" },
   { id: "R-8816", boatId: "s1-grand-turk", category: "Standard Slide Pontoon", start: m(13, 15), duration: HALF_MIN, renter: "Owen Marsh" },
   { id: "R-8817", boatId: "s2-cozumel", category: "Standard Slide Pontoon", start: m(9, 30), duration: FULL_MIN, renter: "Paul Harmon" },
 
@@ -103,13 +128,13 @@ export const reservations: Reservation[] = [
   { id: "R-8820", boatId: "sp1-kitts", category: "Standard Pontoon", start: m(9, 15), duration: HALF_MIN, renter: "Rachel Torres" },
   { id: "R-8821", boatId: "sp2-caicos", category: "Standard Pontoon", start: m(11), duration: HALF_MIN, renter: "Dev Anand" },
   { id: "R-8822", boatId: "sp4-costa-rica", category: "Standard Pontoon", start: m(8), duration: FULL_MIN, renter: "Ed Kowalski" },
-  { id: "R-8823", boatId: "sp5-tortuga", category: "Standard Pontoon", start: m(8), duration: HALF_MIN, renter: "Liam Fox" },
+  { id: "R-8823", boatId: "sp5-tortuga", category: "Standard Pontoon", start: m(8), duration: HALF_MIN, renter: "Liam Fox", stage: "finalized" },
   { id: "R-8824", boatId: "sp5-tortuga", category: "Standard Pontoon", start: m(12, 30), duration: HALF_MIN, renter: "Kim Nguyen" },
 
   // Standard Runabout
   { id: "R-8830", boatId: "sr1-atlantique", category: "Standard Runabout", start: m(10), duration: FULL_MIN, renter: "Jordan Kline" },
   { id: "R-8831", boatId: "sr2-montauk", category: "Standard Runabout", start: m(8, 45), duration: HALF_MIN, renter: "Chris Vogel" },
-  { id: "R-8832", boatId: "sr2-montauk", category: "Standard Runabout", start: m(14), duration: HALF_MIN, renter: "Tara Quinn" },
+  { id: "R-8832", boatId: "sr2-montauk", category: "Standard Runabout", start: m(14), duration: HALF_MIN, renter: "Tara Quinn", stage: "queued" },
 
   // Economy Pontoon
   { id: "R-8840", boatId: "ep1-eppley", category: "Economy Pontoon", start: m(9), duration: HALF_MIN, renter: "Greg Bauer" },
@@ -179,7 +204,8 @@ export function fmt(min: number): string {
   const ap = h < 12 ? "a" : "p";
   h = h % 12;
   if (h === 0) h = 12;
-  return h + (mm ? ":" + String(mm).padStart(2, "0") : "") + ap;
+  // Always zero-pad the minutes so times line up (8:00a, not 8a).
+  return h + ":" + String(mm).padStart(2, "0") + ap;
 }
 export const fmtRange = (s: number, e: number) => `${fmt(s)} – ${fmt(e)}`;
 export const pctLeft = (min: number) =>
@@ -273,7 +299,7 @@ export function quote(opts: {
 // on the board immediately (resets on refresh, like the rest of the demo).
 let resSeq = 8900;
 export function addReservation(r: Omit<Reservation, "id">): Reservation {
-  const created: Reservation = { ...r, id: `R-${resSeq++}` };
+  const created: Reservation = { ...r, id: `R-${resSeq++}`, stage: r.stage ?? "reserved" };
   reservations.push(created);
   return created;
 }

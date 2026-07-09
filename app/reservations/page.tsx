@@ -33,9 +33,12 @@ import {
   accessoriesForBoat,
   quote,
   addReservation,
+  stageConfig,
+  stageOf,
 } from "./data";
 
 const LABEL_W = 132;
+const PEEK_W = 380;
 const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => (8 + i) * 60);
 const groups = rentalFleetByCategory();
 const teal = { bg: "#e1f5ee", border: "#5DCAA5", text: "#0F6E56" };
@@ -43,12 +46,20 @@ const NAVY = "#081731";
 const boatById = (id: string) => fleetBoats.find((b) => b.id === id);
 const money = (n: number) =>
   "$" + (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const digits = (s: string) => s.replace(/\D/g, "");
+const formatPhone = (v: string) => {
+  const d = digits(v).slice(0, 10);
+  if (d.length !== 10) return v;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+};
+const emailOk = (s: string) => /.+@.+\..+/.test(s.trim());
 
 type Prefill = { category?: string; duration?: number; start?: number; boatId?: string };
+type Slot = { boat: Boat; top: number; left: number };
 
 export default function ReservationsPage() {
   const [cardOpen, setCardOpen] = useState(false);
-  const [slot, setSlot] = useState<{ boat: Boat; top: number } | null>(null);
+  const [slot, setSlot] = useState<Slot | null>(null);
   const [detail, setDetail] = useState<Reservation | null>(null);
   const [booking, setBooking] = useState<Prefill | null>(null);
   const [confirmed, setConfirmed] = useState<Reservation | null>(null);
@@ -58,12 +69,6 @@ export default function ReservationsPage() {
   const counts = dayCounts();
   const turnovers = turnoverBoatIds();
 
-  function openSlot(e: React.MouseEvent<HTMLDivElement>, boat: Boat, boardEl: HTMLElement | null) {
-    if (boat.status !== "in-service" || !boardEl) return;
-    const rowRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setSlot({ boat, top: rowRect.bottom - boardEl.getBoundingClientRect().top });
-  }
-
   const nowLeft = `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${pctLeft(NOW_MIN) / 100})`;
 
   return (
@@ -71,9 +76,7 @@ export default function ReservationsPage() {
       {/* Header */}
       <div className="flex items-end justify-between mb-6">
         <div>
-          <p className="text-xs font-semibold text-[#afafaf] uppercase tracking-widest mb-1">
-            Pocono Action Sports
-          </p>
+          <p className="text-xs font-semibold text-[#afafaf] uppercase tracking-widest mb-1">Pocono Action Sports</p>
           <h1 className="text-3xl font-bold text-black tracking-tight leading-tight">Reservations</h1>
           <p className="text-sm text-[#4b4b4b] mt-1">{DEMO_DATE} · 1:30p</p>
         </div>
@@ -92,7 +95,7 @@ export default function ReservationsPage() {
         <Count label="Turnovers" value={counts.turnovers} color="#f59e0b" />
       </div>
 
-      {/* Typical time-slots reference card (the laminated desk card) */}
+      {/* Typical time-slots reference card (redesigned compact) */}
       <div className="mb-5">
         <button
           onClick={() => setCardOpen((v) => !v)}
@@ -104,34 +107,39 @@ export default function ReservationsPage() {
           Typical time slots
           <span className="text-[11px] font-normal text-[#afafaf]">reference · same for every boat type</span>
         </button>
-
         {cardOpen && (
-          <div className="mt-2 bg-white rounded-xl p-5 shadow-[rgba(0,0,0,0.08)_0px_4px_16px] grid grid-cols-3 gap-6">
-            <SlotColumn title="Full day · 7h" wins={typicalWindows.full} />
-            <SlotColumn title="Half day · morning" wins={typicalWindows.halfMorning} />
-            <SlotColumn title="Half day · afternoon" wins={typicalWindows.halfAfternoon} />
+          <div className="mt-2">
+            <TypicalSlots />
           </div>
         )}
       </div>
 
       {/* Board */}
-      <Board turnovers={turnovers} onLaneClick={openSlot} onBlockClick={setDetail} nowLeft={nowLeft} slot={slot} onCloseSlot={() => setSlot(null)} onPickWindow={(boat, start, duration) => { setSlot(null); setBooking({ category: boat.category, boatId: boat.id, start, duration }); }} />
+      <Board
+        turnovers={turnovers}
+        onOpenSlot={setSlot}
+        onBlockClick={setDetail}
+        nowLeft={nowLeft}
+        slot={slot}
+        onCloseSlot={() => setSlot(null)}
+        onPickWindow={(boat, start, duration) => { setSlot(null); setBooking({ category: boat.category, boatId: boat.id, start, duration }); }}
+      />
 
-      <p className="text-xs text-[#afafaf] mt-3">
-        Click an open stretch of a boat&apos;s lane to see its open start times · click a booking to view it ·{" "}
-        {reservations.length} bookings today
-      </p>
+      {/* Stage legend */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3">
+        {(Object.keys(stageConfig) as (keyof typeof stageConfig)[]).map((k) => (
+          <span key={k} className="flex items-center gap-1.5 text-[11px] text-[#6b6b6b]">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: stageConfig[k].dot }} />
+            {stageConfig[k].label}
+          </span>
+        ))}
+        <span className="text-[11px] text-[#afafaf] ml-auto">Click an open lane for start times · click a booking to view it · {reservations.length} bookings today</span>
+      </div>
 
       {detail && <ReservationDetail res={detail} onClose={() => setDetail(null)} />}
-
       {booking && (
-        <BookingScreen
-          prefill={booking}
-          onClose={() => setBooking(null)}
-          onBook={(res) => { setTick((t) => t + 1); setBooking(null); setConfirmed(res); }}
-        />
+        <BookingScreen prefill={booking} onClose={() => setBooking(null)} onBook={(res) => { setTick((t) => t + 1); setBooking(null); setConfirmed(res); }} />
       )}
-
       {confirmed && <Confirmation res={confirmed} onDone={() => setConfirmed(null)} />}
     </div>
   );
@@ -146,13 +154,26 @@ function Count({ label, value, color }: { label: string; value: number; color?: 
   );
 }
 
-function SlotColumn({ title, wins }: { title: string; wins: { start: number; end: number }[] }) {
+// Compact typical-slots card: 3 labeled sections, each a wrapped grid of pills
+// so it fills the width instead of leaving a big blank right side.
+function TypicalSlots() {
+  return (
+    <div className="bg-white rounded-xl p-4 shadow-[rgba(0,0,0,0.08)_0px_4px_16px] grid grid-cols-[1fr_1fr_1fr] gap-x-6 gap-y-1">
+      <SlotSection title="Full day · 7h" wins={typicalWindows.full} />
+      <SlotSection title="Half day · morning" wins={typicalWindows.halfMorning} />
+      <SlotSection title="Half day · afternoon" wins={typicalWindows.halfAfternoon} />
+    </div>
+  );
+}
+function SlotSection({ title, wins }: { title: string; wins: { start: number; end: number }[] }) {
   return (
     <div>
       <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-2">{title}</p>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap gap-1">
         {wins.map((w) => (
-          <span key={w.start} className="text-xs text-[#4b4b4b]">{fmtRange(w.start, w.end)}</span>
+          <span key={w.start} className="text-[11px] font-medium text-[#3f4b5b] bg-[#f4f6f8] rounded-md px-2 py-1 whitespace-nowrap tabular-nums">
+            {fmtRange(w.start, w.end)}
+          </span>
         ))}
       </div>
     </div>
@@ -161,7 +182,7 @@ function SlotColumn({ title, wins }: { title: string; wins: { start: number; end
 
 function Board({
   turnovers,
-  onLaneClick,
+  onOpenSlot,
   onBlockClick,
   nowLeft,
   slot,
@@ -169,14 +190,25 @@ function Board({
   onPickWindow,
 }: {
   turnovers: Set<string>;
-  onLaneClick: (e: React.MouseEvent<HTMLDivElement>, boat: Boat, boardEl: HTMLElement | null) => void;
+  onOpenSlot: (s: Slot) => void;
   onBlockClick: (r: Reservation) => void;
   nowLeft: string;
-  slot: { boat: Boat; top: number } | null;
+  slot: Slot | null;
   onCloseSlot: () => void;
   onPickWindow: (boat: Boat, start: number, duration: number) => void;
 }) {
   const [boardEl, setBoardEl] = useState<HTMLDivElement | null>(null);
+
+  function laneClick(e: React.MouseEvent<HTMLDivElement>, boat: Boat) {
+    if (boat.status !== "in-service" || !boardEl) return;
+    const boardRect = boardEl.getBoundingClientRect();
+    const rowRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const rawLeft = e.clientX - boardRect.left;
+    const maxLeft = Math.max(LABEL_W + 8, boardRect.width - PEEK_W - 8);
+    const left = Math.min(Math.max(rawLeft - 30, LABEL_W + 8), maxLeft);
+    onOpenSlot({ boat, top: rowRect.bottom - boardRect.top, left });
+  }
+
   return (
     <div ref={setBoardEl} className="relative bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] overflow-hidden">
       {/* Time axis */}
@@ -186,7 +218,7 @@ function Board({
         </div>
         <div className="relative flex-1 h-8">
           {HOUR_LABELS.map((min) => (
-            <span key={min} className="absolute -translate-x-1/2 top-2 text-[10px] text-[#afafaf]" style={{ left: `${pctLeft(min)}%` }}>
+            <span key={min} className="absolute -translate-x-1/2 top-2 text-[10px] text-[#afafaf] tabular-nums" style={{ left: `${pctLeft(min)}%` }}>
               {fmt(min)}
             </span>
           ))}
@@ -200,7 +232,7 @@ function Board({
             <span className="text-[11px] font-semibold text-[#4b4b4b]">{g.category}</span>
           </div>
           {g.boats.map((b) => (
-            <BoatRow key={b.id} boat={b} isTurnover={turnovers.has(b.id)} onLaneClick={(e) => onLaneClick(e, b, boardEl)} onBlockClick={onBlockClick} />
+            <BoatRow key={b.id} boat={b} isTurnover={turnovers.has(b.id)} onLaneClick={(e) => laneClick(e, b)} onBlockClick={onBlockClick} />
           ))}
         </div>
       ))}
@@ -210,8 +242,7 @@ function Board({
         <span className="absolute -top-0.5 -left-3.5 text-[9px] font-semibold text-[#D85A30] bg-white px-1">now</span>
       </div>
 
-      {/* Click-a-gap: this boat's open start times */}
-      {slot && <SlotPeek boat={slot.boat} top={slot.top} onClose={onCloseSlot} onPick={onPickWindow} />}
+      {slot && <SlotPeek boat={slot.boat} top={slot.top} left={slot.left} onClose={onCloseSlot} onPick={onPickWindow} />}
     </div>
   );
 }
@@ -231,29 +262,20 @@ function BoatRow({
   const inService = boat.status === "in-service";
   const sc = statusConfig[boat.status as BoatStatus];
 
+  const g = (60 / (DAY_END - DAY_START)) * 100;
   const hourGrid =
-    "repeating-linear-gradient(to right, transparent 0, transparent calc(" +
-    (60 / (DAY_END - DAY_START)) * 100 +
-    "% - 1px), rgba(0,0,0,0.05) calc(" +
-    (60 / (DAY_END - DAY_START)) * 100 +
-    "% - 1px), rgba(0,0,0,0.05) " +
-    (60 / (DAY_END - DAY_START)) * 100 +
-    "%)";
+    `repeating-linear-gradient(to right, transparent 0, transparent calc(${g}% - 1px), rgba(0,0,0,0.05) calc(${g}% - 1px), rgba(0,0,0,0.05) ${g}%)`;
 
   return (
     <div className="flex items-stretch border-b border-black/5">
-      {/* Label */}
       <div style={{ width: LABEL_W, opacity: inService ? 1 : 0.5 }} className="flex-shrink-0 px-3 py-2 border-r border-black/5 flex flex-col justify-center">
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-semibold text-black leading-tight truncate">{boat.name}</span>
-          {isTurnover && (
-            <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded-full flex-shrink-0">turn</span>
-          )}
+          {isTurnover && <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded-full flex-shrink-0">turn</span>}
         </div>
         {boat.code && <span className="text-[10px] font-mono text-[#5C9A9E] font-semibold">{boat.code}</span>}
       </div>
 
-      {/* Lane — click empty area to see open times */}
       <div
         className="relative flex-1 min-h-[46px]"
         style={{ backgroundImage: hourGrid, cursor: inService ? "pointer" : "default" }}
@@ -265,63 +287,66 @@ function BoatRow({
             {boat.maintenanceNote ? ` · ${boat.maintenanceNote.split(".")[0]}` : ""}
           </div>
         ) : (
-          res.map((r) => (
-            <div
-              key={r.id}
-              onClick={(e) => { e.stopPropagation(); onBlockClick(r); }}
-              className="absolute top-[7px] bottom-[7px] rounded-md flex items-center px-2 text-[12px] overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-95"
-              style={{ left: `${pctLeft(r.start)}%`, width: `${pctWidth(r.duration)}%`, background: teal.bg, border: `1px solid ${teal.border}`, color: teal.text }}
-              title={`${r.renter} · ${fmtRange(r.start, resEnd(r))}`}
-            >
-              <span className="truncate">{r.renter} · {fmtRange(r.start, resEnd(r))}</span>
-            </div>
-          ))
+          res.map((r) => {
+            const st = stageConfig[stageOf(r)];
+            return (
+              <div
+                key={r.id}
+                onClick={(e) => { e.stopPropagation(); onBlockClick(r); }}
+                className="absolute top-[7px] bottom-[7px] rounded-md flex items-center px-2 text-[12px] overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-95"
+                style={{ left: `${pctLeft(r.start)}%`, width: `${pctWidth(r.duration)}%`, background: st.bg, border: `1px solid ${st.border}`, color: st.text }}
+                title={`${r.renter} · ${fmtRange(r.start, resEnd(r))} · ${st.label}`}
+              >
+                <span className="truncate tabular-nums">{r.renter} · {fmtRange(r.start, resEnd(r))}</span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>
   );
 }
 
-function SlotPeek({ boat, top, onClose, onPick }: { boat: Boat; top: number; onClose: () => void; onPick: (boat: Boat, start: number, duration: number) => void }) {
+function SlotPeek({ boat, top, left, onClose, onPick }: { boat: Boat; top: number; left: number; onClose: () => void; onPick: (boat: Boat, start: number, duration: number) => void }) {
   const { half, full } = boatOpenWindows(boat.id);
+  const amWins = half.filter((w) => w.start < 12 * 60);
+  const pmWins = half.filter((w) => w.start >= 12 * 60);
   return (
-    <div
-      className="absolute z-20 bg-white rounded-xl border border-black/10 shadow-[rgba(0,0,0,0.16)_0px_8px_28px] p-3.5"
-      style={{ top, left: LABEL_W + 8, width: 380 }}
-    >
+    <div className="absolute z-20 bg-white rounded-xl border border-black/10 shadow-[rgba(0,0,0,0.16)_0px_8px_28px] p-3.5" style={{ top, left, width: PEEK_W }}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-[13px] font-semibold text-black">Open start times · {boat.name}</span>
         <button onClick={onClose} className="text-[#afafaf] hover:text-black text-sm leading-none">×</button>
       </div>
       <p className="text-[10px] text-[#afafaf] mb-2">Tap a time to start the booking.</p>
-      <PeekRow label="Half day · 4h" wins={half} onPick={(s) => onPick(boat, s, HALF_MIN)} />
-      <div className="mt-2">
-        <PeekRow label="Full day · 7h" wins={full} onPick={(s) => onPick(boat, s, FULL_MIN)} />
-      </div>
+
+      <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-1.5">Half day · 4h</p>
+      <PeekGroup sublabel="Morning" wins={amWins} onPick={(s) => onPick(boat, s, HALF_MIN)} />
+      <div className="mt-1.5" />
+      <PeekGroup sublabel="Afternoon" wins={pmWins} onPick={(s) => onPick(boat, s, HALF_MIN)} />
+
+      <div className="border-t border-black/8 my-2.5" />
+      <p className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest mb-1.5">Full day · 7h</p>
+      <Chips wins={full} onPick={(s) => onPick(boat, s, FULL_MIN)} />
     </div>
   );
 }
-
-function PeekRow({ label, wins, onPick }: { label: string; wins: { start: number; end: number }[]; onPick: (start: number) => void }) {
+function PeekGroup({ sublabel, wins, onPick }: { sublabel: string; wins: { start: number; end: number }[]; onPick: (start: number) => void }) {
   return (
-    <div>
-      <p className="text-[10px] text-[#afafaf] mb-1">{label}</p>
-      {wins.length === 0 ? (
-        <p className="text-[11px] text-[#afafaf] italic">None open</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {wins.map((w) => (
-            <button
-              key={w.start}
-              onClick={() => onPick(w.start)}
-              className="px-2.5 py-1 rounded-full text-[11px] font-medium cursor-pointer whitespace-nowrap hover:brightness-95"
-              style={{ background: teal.bg, border: `1px solid ${teal.border}`, color: teal.text }}
-            >
-              {fmtRange(w.start, w.end)}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="flex items-start gap-2">
+      <span className="text-[10px] text-[#afafaf] w-14 flex-shrink-0 pt-1.5">{sublabel}</span>
+      <div className="flex-1"><Chips wins={wins} onPick={onPick} /></div>
+    </div>
+  );
+}
+function Chips({ wins, onPick }: { wins: { start: number; end: number }[]; onPick: (start: number) => void }) {
+  if (wins.length === 0) return <p className="text-[11px] text-[#afafaf] italic pt-1">None open</p>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {wins.map((w) => (
+        <button key={w.start} onClick={() => onPick(w.start)} className="px-2.5 py-1 rounded-full text-[11px] font-medium cursor-pointer whitespace-nowrap hover:brightness-95 tabular-nums" style={{ background: teal.bg, border: `1px solid ${teal.border}`, color: teal.text }}>
+          {fmtRange(w.start, w.end)}
+        </button>
+      ))}
     </div>
   );
 }
@@ -332,17 +357,32 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
   const [duration, setDuration] = useState<number>(prefill.duration ?? FULL_MIN);
   const [start, setStart] = useState<number | null>(prefill.start ?? null);
   const [boatOverride, setBoatOverride] = useState<string | null>(prefill.boatId ?? null);
-  const [partySize, setPartySize] = useState(2);
-  const [eligibility, setEligibility] = useState<"license" | "senior" | null>(null);
-  const [bookerName, setBookerName] = useState("");
+  // Who
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
-  const [captainMode, setCaptainMode] = useState<"same" | "named" | "tbd">("same");
-  const [captainName, setCaptainName] = useState("");
+  const [email, setEmail] = useState("");
+  const [partySize, setPartySize] = useState(2);
+  const [driver, setDriver] = useState<"same" | "separate" | "tbd">("same");
+  const [capFirst, setCapFirst] = useState("");
+  const [capLast, setCapLast] = useState("");
+  const [capPhone, setCapPhone] = useState("");
+  const [capEmail, setCapEmail] = useState("");
+  const [eligibility, setEligibility] = useState<"license" | "senior" | null>(null);
+  // Add-ons
   const [accessoryKeys, setAccessoryKeys] = useState<string[]>([]);
   const [damageWaiver, setDamageWaiver] = useState(false);
   const [cancellationInsurance, setCancellationInsurance] = useState(false);
+  // Pay
+  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExp, setCardExp] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
+  const [billingSame, setBillingSame] = useState(true);
+  const [showTypical, setShowTypical] = useState(false);
 
-  // Derived (recomputed each render)
+  // Derived
   const windows = openWindows(category, duration);
   const effStart = start != null && windows.some((w) => w.start === start) ? start : windows[0]?.start ?? null;
   const hulls = effStart != null ? freeHulls(category, effStart, duration) : [];
@@ -352,53 +392,47 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
   const q = quote({ category, duration, boat: assignedBoat, accessoryKeys: validKeys, damageWaiver, cancellationInsurance });
   const cap = assignedBoat?.capacity ?? 0;
   const overCap = partySize > cap;
+  const rate = RATES[category];
 
   const missing: string[] = [];
   if (effStart == null || !assignedBoat) missing.push("an open time slot");
+  if (!firstName.trim() || !lastName.trim()) missing.push("reservation name");
+  if (!phone.trim()) missing.push("phone");
+  if (!emailOk(email)) missing.push("email");
   if (partySize < 1) missing.push("party size");
   if (overCap) missing.push("party over capacity");
   if (!eligibility) missing.push("driver eligibility");
-  if (!bookerName.trim()) missing.push("booker name");
-  if (captainMode === "named" && !captainName.trim()) missing.push("captain name");
+  if (driver === "separate" && (!capFirst.trim() || !capLast.trim() || !capPhone.trim() || !emailOk(capEmail))) missing.push("captain details");
+  if (!cardName.trim() || digits(cardNumber).length < 15 || !cardExp.trim() || digits(cardCvv).length < 3) missing.push("card details");
   const canBook = missing.length === 0;
 
-  const rate = RATES[category];
-  const toggleAccessory = (key: string) =>
-    setAccessoryKeys((keys) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]));
+  const toggleAccessory = (key: string) => setAccessoryKeys((keys) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]));
 
   function book() {
     if (!canBook || !assignedBoat || effStart == null) return;
-    const captainLabel = captainMode === "tbd" ? "TBD" : captainMode === "named" ? captainName.trim() : bookerName.trim();
+    const renter = `${firstName.trim()} ${lastName.trim()}`.trim();
+    const captainLabel = driver === "tbd" ? "TBD" : driver === "separate" ? `${capFirst.trim()} ${capLast.trim()}`.trim() : renter;
     const created = addReservation({
-      boatId: assignedBoat.id,
-      category,
-      start: effStart,
-      duration,
-      renter: bookerName.trim(), // the individual on the reservation
-      partySize,
-      booker: bookerName.trim(),
-      phone: phone.trim(),
-      captain: captainLabel,
-      accessories: validKeys,
-      damageWaiver,
-      cancellationInsurance,
-      total: q.total,
+      boatId: assignedBoat.id, category, start: effStart, duration, renter, stage: "reserved",
+      partySize, booker: renter, phone: phone.trim(), email: email.trim(), address: address.trim(),
+      captain: captainLabel, accessories: validKeys, damageWaiver, cancellationInsurance,
+      total: q.total, cardName: cardName.trim(), cardLast4: digits(cardNumber).slice(-4),
     });
     onBook(created);
   }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto py-6 px-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-[880px] shadow-2xl overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl w-full max-w-[900px] shadow-2xl overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
         {/* Header with live tax-inclusive total */}
-        <div className="flex items-center justify-between px-6 py-4 text-white" style={{ background: NAVY }}>
+        <div className="flex items-center justify-between px-6 py-4 text-white sticky top-0 z-10" style={{ background: NAVY }}>
           <div>
             <p className="text-[#5C9A9E] text-[11px] font-semibold uppercase tracking-widest">New booking</p>
             <p className="text-lg font-bold leading-tight">{DEMO_DATE_SHORT}, 2026 <span className="text-white/40 font-normal text-sm">· today</span></p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-2xl font-bold leading-none">{money(q.total)}</p>
+              <p className="text-2xl font-bold leading-none tabular-nums">{money(q.total)}</p>
               <p className="text-white/50 text-[11px] mt-0.5">incl. {money(q.tax)} tax · {money(DEPOSIT)} deposit at arrival</p>
             </div>
             <button onClick={onClose} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
@@ -424,7 +458,7 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
                 {windows.length === 0 ? (
                   <div className="text-sm text-[#b23b3b] bg-[#fdecec] border border-[#f5c6c6] rounded-lg px-3 py-2">No open windows for this category · duration today.</div>
                 ) : (
-                  <select value={effStart ?? ""} onChange={(e) => { setStart(Number(e.target.value)); setBoatOverride(null); }} className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm bg-white">
+                  <select value={effStart ?? ""} onChange={(e) => { setStart(Number(e.target.value)); setBoatOverride(null); }} className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm bg-white tabular-nums">
                     {windows.map((w) => <option key={w.start} value={w.start}>{fmtRange(w.start, w.end)}</option>)}
                   </select>
                 )}
@@ -447,36 +481,53 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
           {/* Zone 2 — Who */}
           <Zone label="Who">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Party size">
-                <div className="flex items-center gap-2">
-                  <input type="number" min={1} value={partySize} onChange={(e) => setPartySize(Math.max(1, Number(e.target.value) || 1))} className="w-20 border border-black/15 rounded-lg px-3 py-2 text-sm" />
-                  <span className={`text-sm font-medium ${overCap ? "text-[#b23b3b]" : "text-[#0F6E56]"}`}>
-                    {overCap ? `over capacity (max ${cap})` : assignedBoat ? `of ${cap} ✓` : ""}
-                  </span>
-                </div>
+              <Field label="Reservation name — first">
+                <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
               </Field>
-              <Field label="Driver eligible (PA law)">
-                <div className="flex gap-2">
-                  <PillBtn active={eligibility === "license"} onClick={() => setEligibility("license")}>Boater&apos;s license</PillBtn>
-                  <PillBtn active={eligibility === "senior"} onClick={() => setEligibility("senior")}>Born before 1982</PillBtn>
-                </div>
-              </Field>
-              <Field label="Booker / payer name">
-                <input value={bookerName} onChange={(e) => setBookerName(e.target.value)} placeholder="Individual on the reservation" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
+              <Field label="Last">
+                <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
               </Field>
               <Field label="Phone">
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="570-…" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => setPhone((p) => formatPhone(p))} placeholder="(570) 493-9096" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" />
               </Field>
-              <Field label="Captain (per boat)">
-                <div className="flex gap-2 items-center flex-wrap">
-                  <PillBtn active={captainMode === "same"} onClick={() => setCaptainMode("same")}>Same as booker</PillBtn>
-                  <PillBtn active={captainMode === "named"} onClick={() => setCaptainMode("named")}>Add captain</PillBtn>
-                  <PillBtn active={captainMode === "tbd"} onClick={() => setCaptainMode("tbd")}>TBD</PillBtn>
-                  {captainMode === "named" && (
-                    <input value={captainName} onChange={(e) => setCaptainName(e.target.value)} placeholder="Captain name" className="border border-black/15 rounded-lg px-3 py-2 text-sm flex-1 min-w-[140px]" />
-                  )}
+              <Field label="Email">
+                <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@email.com" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
+              </Field>
+              <Field label="Address (optional)">
+                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, City, ST" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
+              </Field>
+              <Field label="Party size">
+                <div className="flex items-center gap-2">
+                  <input type="number" min={1} value={partySize} onChange={(e) => setPartySize(Math.max(1, Number(e.target.value) || 1))} className="w-20 border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" />
+                  <span className={`text-sm font-medium ${overCap ? "text-[#b23b3b]" : "text-[#0F6E56]"}`}>{overCap ? `over capacity (max ${cap})` : assignedBoat ? `of ${cap} ✓` : ""}</span>
                 </div>
               </Field>
+            </div>
+
+            {/* Who's driving sub-flow */}
+            <div className="mt-4 pt-4 border-t border-black/8">
+              <p className="text-[12px] font-medium text-[#4b4b4b] mb-1.5">Who&apos;s driving?</p>
+              <div className="flex gap-2 flex-wrap">
+                <PillBtn active={driver === "same"} onClick={() => setDriver("same")}>Same as reservation name</PillBtn>
+                <PillBtn active={driver === "separate"} onClick={() => setDriver("separate")}>Separate captain</PillBtn>
+                <PillBtn active={driver === "tbd"} onClick={() => setDriver("tbd")}>TBD</PillBtn>
+              </div>
+              {driver === "separate" && (
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <Field label="Captain — first"><input value={capFirst} onChange={(e) => setCapFirst(e.target.value)} placeholder="First" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" /></Field>
+                  <Field label="Last"><input value={capLast} onChange={(e) => setCapLast(e.target.value)} placeholder="Last" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" /></Field>
+                  <Field label="Captain phone"><input value={capPhone} onChange={(e) => setCapPhone(e.target.value)} onBlur={() => setCapPhone((p) => formatPhone(p))} placeholder="(570) …" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
+                  <Field label="Captain email (for the waiver)"><input value={capEmail} onChange={(e) => setCapEmail(e.target.value)} placeholder="name@email.com" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" /></Field>
+                </div>
+              )}
+              <div className="mt-3">
+                <Field label={driver === "tbd" ? "Driver eligible? (confirm whoever drives qualifies — PA law)" : "Driver eligible (PA law)"}>
+                  <div className="flex gap-2">
+                    <PillBtn active={eligibility === "license"} onClick={() => setEligibility("license")}>Boater&apos;s license</PillBtn>
+                    <PillBtn active={eligibility === "senior"} onClick={() => setEligibility("senior")}>Born before 1982</PillBtn>
+                  </div>
+                </Field>
+              </div>
             </div>
           </Zone>
 
@@ -489,7 +540,7 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
                 <div className="flex flex-wrap gap-2">
                   {accessories.map((a) => (
                     <PillBtn key={a.key} active={validKeys.includes(a.key)} onClick={() => toggleAccessory(a.key)}>
-                      {a.key === "single-tube" ? "Single tube" : a.label} <span className="opacity-60">+{money(a.price)}</span>
+                      {a.label} <span className="opacity-60">+{money(a.price)}</span>
                     </PillBtn>
                   ))}
                 </div>
@@ -505,10 +556,7 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
           <Zone label="Pay">
             <div className="bg-[#fafafa] rounded-xl p-4 text-sm">
               <Line label={`${category} · ${duration === FULL_MIN ? "Full day (7h)" : "Half day (4h)"}`} value={money(q.base)} />
-              {validKeys.map((k) => {
-                const a = accessories.find((x) => x.key === k)!;
-                return <Line key={k} label={a.label} value={money(a.price)} muted />;
-              })}
+              {validKeys.map((k) => { const a = accessories.find((x) => x.key === k)!; return <Line key={k} label={a.label} value={money(a.price)} muted />; })}
               {damageWaiver && <Line label="Damage waiver" value={money(DAMAGE_WAIVER)} muted />}
               {cancellationInsurance && <Line label="Cancellation insurance" value={money(CANCELLATION_INS)} muted />}
               <div className="border-t border-black/10 my-2" />
@@ -516,23 +564,37 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
               <Line label="Tax (6%)" value={money(q.tax)} muted />
               <div className="flex items-center justify-between mt-2">
                 <span className="font-bold text-[#081731]">Total (tax incl.)</span>
-                <span className="font-bold text-[#081731] text-lg">{money(q.total)}</span>
+                <span className="font-bold text-[#081731] text-lg tabular-nums">{money(q.total)}</span>
               </div>
               <p className="text-[11px] text-[#afafaf] mt-2">{money(DEPOSIT)} refundable security deposit collected at arrival — not now.</p>
             </div>
+
+            {/* Card entry (represented — fake data only) */}
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <Field label="Name on card"><input value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Cardholder name" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" /></Field>
+              <Field label="Card number"><input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="4242 4242 4242 4242" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
+              <Field label="Expiry (MM/YY)"><input value={cardExp} onChange={(e) => setCardExp(e.target.value)} placeholder="08/28" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
+              <Field label="CVV"><input value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
+            </div>
+            <label className="flex items-center gap-2 mt-3 text-[13px] text-[#4b4b4b] cursor-pointer">
+              <input type="checkbox" checked={billingSame} onChange={(e) => setBillingSame(e.target.checked)} className="accent-[#0F6E56]" />
+              Billing address same as booking address
+            </label>
           </Zone>
+
+          {/* Very compact typical-slots reference */}
+          <div>
+            <button onClick={() => setShowTypical((v) => !v)} className="flex items-center gap-1.5 text-[11px] font-medium text-[#6b6b6b] hover:text-black">
+              <svg className={`w-3 h-3 transition-transform ${showTypical ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+              Typical time slots (reference)
+            </button>
+            {showTypical && <div className="mt-2"><TypicalSlots /></div>}
+          </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1">
-            <p className="text-[12px] text-[#afafaf]">
-              {canBook ? "Charge card on file to confirm." : `Still needed: ${missing.join(", ")}.`}
-            </p>
-            <button
-              onClick={book}
-              disabled={!canBook}
-              className="text-sm font-semibold px-6 py-2.5 rounded-full text-white transition-colors"
-              style={{ background: canBook ? NAVY : "#c9ccd2", cursor: canBook ? "pointer" : "not-allowed" }}
-            >
+            <p className="text-[12px] text-[#afafaf]">{canBook ? "Charge card to confirm." : `Still needed: ${missing.join(", ")}.`}</p>
+            <button onClick={book} disabled={!canBook} className="text-sm font-semibold px-6 py-2.5 rounded-full text-white transition-colors tabular-nums" style={{ background: canBook ? NAVY : "#c9ccd2", cursor: canBook ? "pointer" : "not-allowed" }}>
               Book it · {money(q.total)} →
             </button>
           </div>
@@ -562,7 +624,7 @@ function DurBtn({ active, onClick, title, price }: { active: boolean; onClick: (
   return (
     <button onClick={onClick} className="flex-1 rounded-lg border px-3 py-2 text-left transition-colors" style={{ background: active ? teal.bg : "#fff", borderColor: active ? teal.border : "rgba(0,0,0,0.15)" }}>
       <span className="block text-[12px] font-semibold" style={{ color: active ? teal.text : "#000" }}>{title}</span>
-      <span className="block text-[12px]" style={{ color: active ? teal.text : "#afafaf" }}>{price}</span>
+      <span className="block text-[12px] tabular-nums" style={{ color: active ? teal.text : "#afafaf" }}>{price}</span>
     </button>
   );
 }
@@ -585,16 +647,19 @@ function Line({ label, value, muted }: { label: string; value: string; muted?: b
   return (
     <div className="flex items-center justify-between py-0.5">
       <span className={muted ? "text-[#6b6b6b]" : "text-black font-medium"}>{label}</span>
-      <span className={muted ? "text-[#6b6b6b]" : "text-black font-medium"}>{value}</span>
+      <span className={`tabular-nums ${muted ? "text-[#6b6b6b]" : "text-black font-medium"}`}>{value}</span>
     </div>
   );
 }
 
 function Confirmation({ res, onDone }: { res: Reservation; onDone: () => void }) {
   const boat = boatById(res.boatId);
+  const accLabels = (res.accessories ?? []).map((k) => accessoriesForBoat(boat).find((a) => a.key === k)?.label ?? k);
+  const [checks, setChecks] = useState<Record<string, boolean>>({ arrive: false, waiver: false, deposit: false });
+  const toggle = (k: string) => setChecks((c) => ({ ...c, [k]: !c[k] }));
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-4" onClick={onDone}>
-      <div className="bg-white rounded-2xl w-full max-w-[440px] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-4 py-6 overflow-y-auto" onClick={onDone}>
+      <div className="bg-white rounded-2xl w-full max-w-[460px] shadow-2xl overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-5 text-white" style={{ background: NAVY }}>
           <div className="flex items-center gap-2.5">
             <span className="flex items-center justify-center w-7 h-7 rounded-full" style={{ background: teal.border }}>
@@ -608,27 +673,43 @@ function Confirmation({ res, onDone }: { res: Reservation; onDone: () => void })
         </div>
         <div className="p-6 space-y-2.5 text-sm">
           <Line label="Name" value={res.renter} muted />
+          <Line label="Date" value={DEMO_DATE} muted />
           <Line label="Boat" value={boat ? `${boat.name}${boat.code ? ` (${boat.code})` : ""}` : "—"} muted />
           <Line label="Time" value={fmtRange(res.start, resEnd(res))} muted />
           <Line label="Party" value={`${res.partySize} of ${boat?.capacity ?? "—"}`} muted />
-          <Line label="Charged" value={money(res.total ?? 0)} />
-          <div className="bg-[#f0f7fb] border border-[#d0e8f5] rounded-xl p-3 mt-2">
-            <p className="text-[12px] text-[#2A5B7D] leading-relaxed">
-              Tell them to <b>arrive 45 minutes early</b> to sign the waiver, put down the {money(DEPOSIT)} deposit, and get set up. Waiver + reminder emails go out ahead of the date — signing at home saves ~5 min at the desk.
-            </p>
+          <Line label="Accessories" value={accLabels.length ? accLabels.join(", ") : "None"} muted />
+          <Line label="Charged" value={`${money(res.total ?? 0)}${res.cardLast4 ? ` · Card •••• ${res.cardLast4}` : ""}`} />
+
+          {/* Say-and-confirm checklist (tick as you talk; does NOT block Done) */}
+          <div className="bg-[#f0f7fb] border border-[#d0e8f5] rounded-xl p-3 mt-2 space-y-2">
+            <p className="text-[11px] font-semibold text-[#2A5B7D] uppercase tracking-widest">Tell them on the phone</p>
+            <CheckLine on={checks.arrive} onClick={() => toggle("arrive")} label="Arrive 45 minutes early" />
+            <CheckLine on={checks.waiver} onClick={() => toggle("waiver")} label="Sign the waiver ahead (or in person)" />
+            <CheckLine on={checks.deposit} onClick={() => toggle("deposit")} label={`${money(DEPOSIT)} security deposit at arrival`} />
           </div>
+
           <button onClick={onDone} className="w-full mt-2 text-sm font-semibold px-6 py-2.5 rounded-full text-white" style={{ background: NAVY }}>Done</button>
         </div>
       </div>
     </div>
   );
 }
+function CheckLine({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button onClick={onClick} className="flex items-center gap-2 text-left w-full">
+      <span className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border" style={{ background: on ? teal.border : "#fff", borderColor: on ? teal.border : "#cbd5e1" }}>
+        {on && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+      </span>
+      <span className={`text-[12px] ${on ? "text-[#2A5B7D] line-through opacity-70" : "text-[#2A5B7D]"}`}>{label}</span>
+    </button>
+  );
+}
 
 function ReservationDetail({ res, onClose }: { res: Reservation; onClose: () => void }) {
   const boat = boatById(res.boatId);
-  const status =
-    res.start > NOW_MIN ? "Reserved · upcoming" : resEnd(res) > NOW_MIN ? "On the water" : "Returned";
+  const st = stageConfig[stageOf(res)];
   const dur = res.duration >= 420 ? "Full day (7h)" : "Half day (4h)";
+  const accLabels = (res.accessories ?? []).map((k) => accessoriesForBoat(boat).find((a) => a.key === k)?.label ?? k);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end" onClick={onClose}>
@@ -642,8 +723,9 @@ function ReservationDetail({ res, onClose }: { res: Reservation; onClose: () => 
             </div>
             <button onClick={onClose} className="text-white/40 hover:text-white text-2xl leading-none mt-1">×</button>
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mt-3 bg-white/10">
-            {status}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mt-3" style={{ background: st.bg, color: st.text, border: `1px solid ${st.border}` }}>
+            <span className="w-2 h-2 rounded-full" style={{ background: st.dot }} />
+            {st.label}
           </div>
         </div>
 
@@ -655,11 +737,12 @@ function ReservationDetail({ res, onClose }: { res: Reservation; onClose: () => 
           <DRow label="Category" value={res.category} />
           {res.partySize != null && <DRow label="Party size" value={`${res.partySize}${boat ? ` of ${boat.capacity}` : ""}`} />}
           <DRow label="Captain" value={res.captain ?? res.renter} />
-          {res.total != null && <DRow label="Charged" value={money(res.total)} />}
+          {res.accessories != null && <DRow label="Accessories" value={accLabels.length ? accLabels.join(", ") : "None"} />}
+          {res.total != null && <DRow label="Charged" value={`${money(res.total)}${res.cardLast4 ? ` · •••• ${res.cardLast4}` : ""}`} />}
 
           <div className="bg-[#f0f7fb] border border-[#d0e8f5] rounded-xl p-3 mt-2">
             <p className="text-[11px] text-[#2A5B7D] leading-relaxed">
-              View only for now. The full booking record — payment, deposit, waiver, accessories, damage photos, and actions like reassigning or flagging damage — comes once we design how a reservation weaves into booking and maintenance.
+              View only for now. The full booking record — waiver, damage photos, and actions like reassigning or flagging damage — comes once we design how a reservation weaves into booking and maintenance.
             </p>
           </div>
         </div>
