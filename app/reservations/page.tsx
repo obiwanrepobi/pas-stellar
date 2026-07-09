@@ -37,11 +37,12 @@ import {
   stageOf,
 } from "./data";
 
-const LABEL_W = 132;
+const LABEL_W = 168;
 const PEEK_W = 380;
 const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => (8 + i) * 60);
 const groups = rentalFleetByCategory();
 const teal = { bg: "#e1f5ee", border: "#5DCAA5", text: "#0F6E56" };
+const GRAY = { bg: "#f1f3f5", border: "#dde1e6", text: "#697586" };
 const NAVY = "#081731";
 const boatById = (id: string) => fleetBoats.find((b) => b.id === id);
 const money = (n: number) =>
@@ -53,6 +54,8 @@ const formatPhone = (v: string) => {
   return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
 };
 const emailOk = (s: string) => /.+@.+\..+/.test(s.trim());
+const formatCard = (v: string) => digits(v).slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
+const formatExp = (v: string) => { const d = digits(v).slice(0, 4); return d.length >= 3 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; };
 
 type Prefill = { category?: string; duration?: number; start?: number; boatId?: string };
 type Slot = { boat: Boat; top: number; left: number };
@@ -282,7 +285,7 @@ function BoatRow({
         onClick={inService ? onLaneClick : undefined}
       >
         {!inService ? (
-          <div className="absolute inset-1.5 rounded-md flex items-center px-3 text-[12px]" style={{ background: sc.bg, border: `1px solid ${sc.border}`, color: sc.text }}>
+          <div className="absolute inset-1.5 rounded-md flex items-center px-3 text-[12px]" style={{ background: GRAY.bg, border: `1px solid ${GRAY.border}`, color: GRAY.text }}>
             {sc.label}
             {boat.maintenanceNote ? ` · ${boat.maintenanceNote.split(".")[0]}` : ""}
           </div>
@@ -360,7 +363,10 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
   // Who
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [address, setAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [stateAbbr, setStateAbbr] = useState("");
+  const [zip, setZip] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [partySize, setPartySize] = useState(2);
@@ -380,7 +386,10 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
   const [cardExp, setCardExp] = useState("");
   const [cardCvv, setCardCvv] = useState("");
   const [billingSame, setBillingSame] = useState(true);
-  const [showTypical, setShowTypical] = useState(false);
+  const [billStreet, setBillStreet] = useState("");
+  const [billCity, setBillCity] = useState("");
+  const [billStateAbbr, setBillStateAbbr] = useState("");
+  const [billZip, setBillZip] = useState("");
 
   // Derived
   const windows = openWindows(category, duration);
@@ -412,9 +421,10 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
     if (!canBook || !assignedBoat || effStart == null) return;
     const renter = `${firstName.trim()} ${lastName.trim()}`.trim();
     const captainLabel = driver === "tbd" ? "TBD" : driver === "separate" ? `${capFirst.trim()} ${capLast.trim()}`.trim() : renter;
+    const composedAddress = [street.trim(), [city.trim(), stateAbbr.trim(), zip.trim()].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     const created = addReservation({
       boatId: assignedBoat.id, category, start: effStart, duration, renter, stage: "reserved",
-      partySize, booker: renter, phone: phone.trim(), email: email.trim(), address: address.trim(),
+      partySize, booker: renter, phone: phone.trim(), email: email.trim(), address: composedAddress,
       captain: captainLabel, accessories: validKeys, damageWaiver, cancellationInsurance,
       total: q.total, cardName: cardName.trim(), cardLast4: digits(cardNumber).slice(-4),
     });
@@ -493,15 +503,24 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
               <Field label="Email">
                 <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@email.com" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
               </Field>
-              <Field label="Address (optional)">
-                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, City, ST" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
-              </Field>
               <Field label="Party size">
                 <div className="flex items-center gap-2">
                   <input type="number" min={1} value={partySize} onChange={(e) => setPartySize(Math.max(1, Number(e.target.value) || 1))} className="w-20 border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" />
                   <span className={`text-sm font-medium ${overCap ? "text-[#b23b3b]" : "text-[#0F6E56]"}`}>{overCap ? `over capacity (max ${cap})` : assignedBoat ? `of ${cap} ✓` : ""}</span>
                 </div>
               </Field>
+            </div>
+            <div className="mt-4">
+              <Field label="Address (optional)">
+                <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Street address" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
+              </Field>
+            </div>
+            <div className="grid grid-cols-4 gap-4 mt-3">
+              <div className="col-span-2">
+                <Field label="City"><input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" /></Field>
+              </div>
+              <Field label="State"><input value={stateAbbr} onChange={(e) => setStateAbbr(e.target.value.toUpperCase().slice(0, 2))} placeholder="PA" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm uppercase" /></Field>
+              <Field label="ZIP"><input value={zip} onChange={(e) => setZip(digits(e.target.value).slice(0, 5))} placeholder="18428" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
             </div>
 
             {/* Who's driving sub-flow */}
@@ -572,24 +591,32 @@ function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose
             {/* Card entry (represented — fake data only) */}
             <div className="grid grid-cols-2 gap-4 mt-4">
               <Field label="Name on card"><input value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Cardholder name" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" /></Field>
-              <Field label="Card number"><input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="4242 4242 4242 4242" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
-              <Field label="Expiry (MM/YY)"><input value={cardExp} onChange={(e) => setCardExp(e.target.value)} placeholder="08/28" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
-              <Field label="CVV"><input value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
+              <Field label="Card number">
+                <input value={cardNumber} onChange={(e) => setCardNumber(formatCard(e.target.value))} inputMode="numeric" placeholder="4242 4242 4242 4242" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums tracking-wider" />
+                <p className="text-[10px] text-[#afafaf] mt-1 tabular-nums">{digits(cardNumber).length}/16 digits</p>
+              </Field>
+              <Field label="Expiry (MM/YY)"><input value={cardExp} onChange={(e) => setCardExp(formatExp(e.target.value))} inputMode="numeric" placeholder="08/28" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
+              <Field label="CVV"><input value={cardCvv} onChange={(e) => setCardCvv(digits(e.target.value).slice(0, 4))} inputMode="numeric" placeholder="123" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
             </div>
             <label className="flex items-center gap-2 mt-3 text-[13px] text-[#4b4b4b] cursor-pointer">
               <input type="checkbox" checked={billingSame} onChange={(e) => setBillingSame(e.target.checked)} className="accent-[#0F6E56]" />
               Billing address same as booking address
             </label>
+            {billingSame ? (
+              <p className="text-[11px] text-[#afafaf] mt-2">Using the booking address above.</p>
+            ) : (
+              <div className="mt-3">
+                <Field label="Billing address">
+                  <input value={billStreet} onChange={(e) => setBillStreet(e.target.value)} placeholder="Street address" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
+                </Field>
+                <div className="grid grid-cols-4 gap-4 mt-3">
+                  <div className="col-span-2"><Field label="City"><input value={billCity} onChange={(e) => setBillCity(e.target.value)} placeholder="City" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" /></Field></div>
+                  <Field label="State"><input value={billStateAbbr} onChange={(e) => setBillStateAbbr(e.target.value.toUpperCase().slice(0, 2))} placeholder="PA" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm uppercase" /></Field>
+                  <Field label="ZIP"><input value={billZip} onChange={(e) => setBillZip(digits(e.target.value).slice(0, 5))} placeholder="18428" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm tabular-nums" /></Field>
+                </div>
+              </div>
+            )}
           </Zone>
-
-          {/* Very compact typical-slots reference */}
-          <div>
-            <button onClick={() => setShowTypical((v) => !v)} className="flex items-center gap-1.5 text-[11px] font-medium text-[#6b6b6b] hover:text-black">
-              <svg className={`w-3 h-3 transition-transform ${showTypical ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-              Typical time slots (reference)
-            </button>
-            {showTypical && <div className="mt-2"><TypicalSlots /></div>}
-          </div>
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-1">

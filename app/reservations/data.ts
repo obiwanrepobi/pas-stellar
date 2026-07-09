@@ -65,7 +65,7 @@ export const stageConfig: Record<
   ReservationStage,
   { label: string; bg: string; border: string; text: string; dot: string }
 > = {
-  reserved: { label: "Reserved", bg: "#eef1f5", border: "#cbd5e1", text: "#3f4b5b", dot: "#94a3b8" },
+  reserved: { label: "Reserved", bg: "#fdeaea", border: "#f3b6b6", text: "#a12d2d", dot: "#e05252" },
   queued: { label: "Queued", bg: "#ede9fe", border: "#c4b5fd", text: "#5b21b6", dot: "#8b5cf6" },
   "on-water": { label: "On the water", bg: "#dbeafe", border: "#93c5fd", text: "#1e3a8a", dot: "#3b82f6" },
   returned: { label: "Returned", bg: "#d1fae5", border: "#6ee7b7", text: "#065f46", dot: "#10b981" },
