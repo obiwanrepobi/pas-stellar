@@ -31,7 +31,28 @@ export const RENTAL_CATEGORIES = [
   "Standard Pontoon",
   "Standard Runabout",
   "Economy Pontoon",
+  "Economy Runabout",
+  "Premium Pontoon Fishing Boat",
+  "Center Console Fishing Boat",
 ];
+
+// ─── Rate card (source of truth: PAS/RATE_CARD.md) ────────────────────────────
+export const TAX_RATE = 0.06; // PA sales tax, shown INCLUSIVE at quote
+export const DEPOSIT = 500; // refundable security deposit, taken at ARRIVAL
+export const DAMAGE_WAIVER = 30; // head-on collisions only
+export const CANCELLATION_INS = 50; // Tiki $25/ticket (parked)
+
+export const RATES: Record<string, { half: number; full: number }> = {
+  "Premium Slide Pontoon": { half: 750, full: 1180 },
+  "Standard Slide Pontoon": { half: 605, full: 1035 },
+  "Premium Pontoon": { half: 450, full: 685 },
+  "Standard Pontoon": { half: 400, full: 610 },
+  "Economy Pontoon": { half: 385, full: 485 },
+  "Standard Runabout": { half: 400, full: 615 },
+  "Economy Runabout": { half: 250, full: 375 },
+  "Center Console Fishing Boat": { half: 300, full: 550 },
+  "Premium Pontoon Fishing Boat": { half: 450, full: 685 },
+};
 
 // ─── Reservation type ───────────────────────────────────────────────────────
 // Customer requests a CATEGORY; a specific hull is auto-slotted at booking time,
@@ -42,7 +63,16 @@ export interface Reservation {
   category: string;
   start: number; // minutes from midnight
   duration: number; // HALF_MIN | FULL_MIN
-  renter: string; // captain / renter of record
+  renter: string; // captain / renter of record — ALWAYS one individual, never a party/family name
+  // Optional booking-screen fields (present on newly-created bookings)
+  partySize?: number;
+  booker?: string;
+  phone?: string;
+  captain?: string; // "TBD" allowed
+  accessories?: string[]; // accessory keys
+  damageWaiver?: boolean;
+  cancellationInsurance?: boolean;
+  total?: number; // tax-inclusive total charged at booking
 }
 export const resEnd = (r: Reservation) => r.start + r.duration;
 export const reservationsForBoat = (boatId: string) =>
@@ -62,19 +92,19 @@ export const reservations: Reservation[] = [
   { id: "R-8807", boatId: "pp10-belle", category: "Premium Pontoon", start: m(8, 30), duration: FULL_MIN, renter: "Priya Shah" },
 
   // Premium Slide Pontoon
-  { id: "R-8810", boatId: "psp1-breaksea", category: "Premium Slide Pontoon", start: m(10), duration: FULL_MIN, renter: "The Delgado Party" },
+  { id: "R-8810", boatId: "psp1-breaksea", category: "Premium Slide Pontoon", start: m(10), duration: FULL_MIN, renter: "Marcus Delgado" },
 
   // Standard Slide Pontoon
   { id: "R-8815", boatId: "s1-grand-turk", category: "Standard Slide Pontoon", start: m(8, 15), duration: HALF_MIN, renter: "Kayla Brooks" },
   { id: "R-8816", boatId: "s1-grand-turk", category: "Standard Slide Pontoon", start: m(13, 15), duration: HALF_MIN, renter: "Owen Marsh" },
-  { id: "R-8817", boatId: "s2-cozumel", category: "Standard Slide Pontoon", start: m(9, 30), duration: FULL_MIN, renter: "The Harmon Family" },
+  { id: "R-8817", boatId: "s2-cozumel", category: "Standard Slide Pontoon", start: m(9, 30), duration: FULL_MIN, renter: "Paul Harmon" },
 
   // Standard Pontoon
   { id: "R-8820", boatId: "sp1-kitts", category: "Standard Pontoon", start: m(9, 15), duration: HALF_MIN, renter: "Rachel Torres" },
   { id: "R-8821", boatId: "sp2-caicos", category: "Standard Pontoon", start: m(11), duration: HALF_MIN, renter: "Dev Anand" },
-  { id: "R-8822", boatId: "sp4-costa-rica", category: "Standard Pontoon", start: m(8), duration: FULL_MIN, renter: "The Kowalskis" },
+  { id: "R-8822", boatId: "sp4-costa-rica", category: "Standard Pontoon", start: m(8), duration: FULL_MIN, renter: "Ed Kowalski" },
   { id: "R-8823", boatId: "sp5-tortuga", category: "Standard Pontoon", start: m(8), duration: HALF_MIN, renter: "Liam Fox" },
-  { id: "R-8824", boatId: "sp5-tortuga", category: "Standard Pontoon", start: m(12, 30), duration: HALF_MIN, renter: "The Nguyens" },
+  { id: "R-8824", boatId: "sp5-tortuga", category: "Standard Pontoon", start: m(12, 30), duration: HALF_MIN, renter: "Kim Nguyen" },
 
   // Standard Runabout
   { id: "R-8830", boatId: "sr1-atlantique", category: "Standard Runabout", start: m(10), duration: FULL_MIN, renter: "Jordan Kline" },
@@ -82,7 +112,7 @@ export const reservations: Reservation[] = [
   { id: "R-8832", boatId: "sr2-montauk", category: "Standard Runabout", start: m(14), duration: HALF_MIN, renter: "Tara Quinn" },
 
   // Economy Pontoon
-  { id: "R-8840", boatId: "ep1-eppley", category: "Economy Pontoon", start: m(9), duration: HALF_MIN, renter: "The Bauer Family" },
+  { id: "R-8840", boatId: "ep1-eppley", category: "Economy Pontoon", start: m(9), duration: HALF_MIN, renter: "Greg Bauer" },
 ];
 
 // ─── Availability engine ──────────────────────────────────────────────────────
@@ -178,3 +208,72 @@ export const typicalWindows = {
   halfMorning: HALF_STARTS.filter((s) => s < 12 * 60).map((s) => ({ start: s, end: s + HALF_MIN })),
   halfAfternoon: HALF_STARTS.filter((s) => s >= 12 * 60).map((s) => ({ start: s, end: s + HALF_MIN })),
 };
+
+// ─── Booking: auto-slot, accessories, quote, create ───────────────────────────
+
+// Every hull of a category that's free for a given window (buffer included).
+// The board auto-slots the first; the manager can override to any of these.
+export function freeHulls(category: string, start: number, duration: number): Boat[] {
+  const end = start + duration;
+  return bookableBoats(category).filter((b) => boatFree(b.id, start, end));
+}
+
+// Accessories are gated by the ASSIGNED boat's capability, and priced per-boat
+// (water mat is $60 on the fishing pontoon, $50 elsewhere; hot dog tube is
+// fishing-pontoon only). Source: PAS/RATE_CARD.md.
+export interface Accessory {
+  key: string;
+  label: string;
+  price: number;
+}
+export function accessoriesForBoat(boat: Boat | null | undefined): Accessory[] {
+  if (!boat) return [];
+  const isFishingPontoon = boat.category === "Premium Pontoon Fishing Boat";
+  const list: Accessory[] = [];
+  if (boat.canPullTube) list.push({ key: "single-tube", label: "Single tube", price: 30 });
+  if (boat.canPullDouble) list.push({ key: "double-tube", label: "Double tube", price: 60 });
+  if (isFishingPontoon) list.push({ key: "hotdog-tube", label: "Hot dog tube", price: 60 });
+  if (boat.canPullKneeboard) list.push({ key: "kneeboard", label: "Kneeboard", price: 30 });
+  if (boat.hasWaterMat) list.push({ key: "water-mat", label: "Water mat", price: isFishingPontoon ? 60 : 50 });
+  return list;
+}
+
+export interface Quote {
+  base: number;
+  addOns: number;
+  subtotal: number;
+  tax: number;
+  total: number; // tax-inclusive
+}
+export function quote(opts: {
+  category: string;
+  duration: number;
+  boat?: Boat | null;
+  accessoryKeys: string[];
+  damageWaiver: boolean;
+  cancellationInsurance: boolean;
+}): Quote {
+  const rate = RATES[opts.category];
+  const base = rate ? (opts.duration === FULL_MIN ? rate.full : rate.half) : 0;
+  let addOns = 0;
+  const avail = accessoriesForBoat(opts.boat);
+  opts.accessoryKeys.forEach((k) => {
+    const a = avail.find((x) => x.key === k);
+    if (a) addOns += a.price;
+  });
+  if (opts.damageWaiver) addOns += DAMAGE_WAIVER;
+  if (opts.cancellationInsurance) addOns += CANCELLATION_INS;
+  const subtotal = base + addOns;
+  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
+  const total = Math.round((subtotal + tax) * 100) / 100;
+  return { base, addOns, subtotal, tax, total };
+}
+
+// Session-live: push a new booking onto the in-memory reservations so it appears
+// on the board immediately (resets on refresh, like the rest of the demo).
+let resSeq = 8900;
+export function addReservation(r: Omit<Reservation, "id">): Reservation {
+  const created: Reservation = { ...r, id: `R-${resSeq++}` };
+  reservations.push(created);
+  return created;
+}

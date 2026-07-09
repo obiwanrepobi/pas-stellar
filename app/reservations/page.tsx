@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { statusConfig, boats as fleetBoats, type Boat, type BoatStatus } from "../fleet/data";
 import {
   Reservation,
@@ -20,28 +20,48 @@ import {
   resEnd,
   reservations,
   DEMO_DATE,
+  DEMO_DATE_SHORT,
+  HALF_MIN,
+  FULL_MIN,
+  RENTAL_CATEGORIES,
+  RATES,
+  DEPOSIT,
+  DAMAGE_WAIVER,
+  CANCELLATION_INS,
+  openWindows,
+  freeHulls,
+  accessoriesForBoat,
+  quote,
+  addReservation,
 } from "./data";
 
 const LABEL_W = 132;
 const HOUR_LABELS = Array.from({ length: 12 }, (_, i) => (8 + i) * 60);
 const groups = rentalFleetByCategory();
-const counts = dayCounts();
-const turnovers = turnoverBoatIds();
 const teal = { bg: "#e1f5ee", border: "#5DCAA5", text: "#0F6E56" };
+const NAVY = "#081731";
 const boatById = (id: string) => fleetBoats.find((b) => b.id === id);
+const money = (n: number) =>
+  "$" + (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+type Prefill = { category?: string; duration?: number; start?: number; boatId?: string };
 
 export default function ReservationsPage() {
-  const boardRef = useRef<HTMLDivElement>(null);
   const [cardOpen, setCardOpen] = useState(false);
   const [slot, setSlot] = useState<{ boat: Boat; top: number } | null>(null);
   const [detail, setDetail] = useState<Reservation | null>(null);
+  const [booking, setBooking] = useState<Prefill | null>(null);
+  const [confirmed, setConfirmed] = useState<Reservation | null>(null);
+  const [, setTick] = useState(0);
 
-  function openSlot(e: React.MouseEvent<HTMLDivElement>, boat: Boat) {
-    if (boat.status !== "in-service") return;
-    const board = boardRef.current;
-    if (!board) return;
+  // Recomputed each render off the live (mutable) reservations array.
+  const counts = dayCounts();
+  const turnovers = turnoverBoatIds();
+
+  function openSlot(e: React.MouseEvent<HTMLDivElement>, boat: Boat, boardEl: HTMLElement | null) {
+    if (boat.status !== "in-service" || !boardEl) return;
     const rowRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setSlot({ boat, top: rowRect.bottom - board.getBoundingClientRect().top });
+    setSlot({ boat, top: rowRect.bottom - boardEl.getBoundingClientRect().top });
   }
 
   const nowLeft = `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${pctLeft(NOW_MIN) / 100})`;
@@ -57,7 +77,10 @@ export default function ReservationsPage() {
           <h1 className="text-3xl font-bold text-black tracking-tight leading-tight">Reservations</h1>
           <p className="text-sm text-[#4b4b4b] mt-1">{DEMO_DATE} · 1:30p</p>
         </div>
-        <button className="bg-black text-white text-sm font-medium px-5 py-2 rounded-full hover:bg-[#1a1a1a] transition-colors">
+        <button
+          onClick={() => setBooking({})}
+          className="bg-black text-white text-sm font-medium px-5 py-2 rounded-full hover:bg-[#1a1a1a] transition-colors"
+        >
           + New booking
         </button>
       </div>
@@ -92,46 +115,7 @@ export default function ReservationsPage() {
       </div>
 
       {/* Board */}
-      <div
-        ref={boardRef}
-        className="relative bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] overflow-hidden"
-      >
-        {/* Time axis */}
-        <div className="flex bg-[#fafafa] border-b border-black/5">
-          <div style={{ width: LABEL_W }} className="flex-shrink-0 px-3 py-2">
-            <span className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest">Boat</span>
-          </div>
-          <div className="relative flex-1 h-8">
-            {HOUR_LABELS.map((min) => (
-              <span key={min} className="absolute -translate-x-1/2 top-2 text-[10px] text-[#afafaf]" style={{ left: `${pctLeft(min)}%` }}>
-                {fmt(min)}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Category groups */}
-        {groups.map((g) => (
-          <div key={g.category}>
-            <div className="px-3 py-1.5 bg-[#fafafa] border-b border-black/5">
-              <span className="text-[11px] font-semibold text-[#4b4b4b]">{g.category}</span>
-            </div>
-            {g.boats.map((b) => (
-              <BoatRow key={b.id} boat={b} onLaneClick={(e) => openSlot(e, b)} onBlockClick={setDetail} />
-            ))}
-          </div>
-        ))}
-
-        {/* Now line */}
-        <div className="absolute pointer-events-none z-10" style={{ left: nowLeft, top: 32, bottom: 0, width: 2, background: "#D85A30" }}>
-          <span className="absolute -top-0.5 -left-3.5 text-[9px] font-semibold text-[#D85A30] bg-white px-1">now</span>
-        </div>
-
-        {/* Click-a-gap: this boat's open start times */}
-        {slot && (
-          <SlotPeek boat={slot.boat} top={slot.top} onClose={() => setSlot(null)} />
-        )}
-      </div>
+      <Board turnovers={turnovers} onLaneClick={openSlot} onBlockClick={setDetail} nowLeft={nowLeft} slot={slot} onCloseSlot={() => setSlot(null)} onPickWindow={(boat, start, duration) => { setSlot(null); setBooking({ category: boat.category, boatId: boat.id, start, duration }); }} />
 
       <p className="text-xs text-[#afafaf] mt-3">
         Click an open stretch of a boat&apos;s lane to see its open start times · click a booking to view it ·{" "}
@@ -139,6 +123,16 @@ export default function ReservationsPage() {
       </p>
 
       {detail && <ReservationDetail res={detail} onClose={() => setDetail(null)} />}
+
+      {booking && (
+        <BookingScreen
+          prefill={booking}
+          onClose={() => setBooking(null)}
+          onBook={(res) => { setTick((t) => t + 1); setBooking(null); setConfirmed(res); }}
+        />
+      )}
+
+      {confirmed && <Confirmation res={confirmed} onDone={() => setConfirmed(null)} />}
     </div>
   );
 }
@@ -165,19 +159,77 @@ function SlotColumn({ title, wins }: { title: string; wins: { start: number; end
   );
 }
 
+function Board({
+  turnovers,
+  onLaneClick,
+  onBlockClick,
+  nowLeft,
+  slot,
+  onCloseSlot,
+  onPickWindow,
+}: {
+  turnovers: Set<string>;
+  onLaneClick: (e: React.MouseEvent<HTMLDivElement>, boat: Boat, boardEl: HTMLElement | null) => void;
+  onBlockClick: (r: Reservation) => void;
+  nowLeft: string;
+  slot: { boat: Boat; top: number } | null;
+  onCloseSlot: () => void;
+  onPickWindow: (boat: Boat, start: number, duration: number) => void;
+}) {
+  const [boardEl, setBoardEl] = useState<HTMLDivElement | null>(null);
+  return (
+    <div ref={setBoardEl} className="relative bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] overflow-hidden">
+      {/* Time axis */}
+      <div className="flex bg-[#fafafa] border-b border-black/5">
+        <div style={{ width: LABEL_W }} className="flex-shrink-0 px-3 py-2">
+          <span className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest">Boat</span>
+        </div>
+        <div className="relative flex-1 h-8">
+          {HOUR_LABELS.map((min) => (
+            <span key={min} className="absolute -translate-x-1/2 top-2 text-[10px] text-[#afafaf]" style={{ left: `${pctLeft(min)}%` }}>
+              {fmt(min)}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Category groups */}
+      {groups.map((g) => (
+        <div key={g.category}>
+          <div className="px-3 py-1.5 bg-[#fafafa] border-b border-black/5">
+            <span className="text-[11px] font-semibold text-[#4b4b4b]">{g.category}</span>
+          </div>
+          {g.boats.map((b) => (
+            <BoatRow key={b.id} boat={b} isTurnover={turnovers.has(b.id)} onLaneClick={(e) => onLaneClick(e, b, boardEl)} onBlockClick={onBlockClick} />
+          ))}
+        </div>
+      ))}
+
+      {/* Now line */}
+      <div className="absolute pointer-events-none z-10" style={{ left: nowLeft, top: 32, bottom: 0, width: 2, background: "#D85A30" }}>
+        <span className="absolute -top-0.5 -left-3.5 text-[9px] font-semibold text-[#D85A30] bg-white px-1">now</span>
+      </div>
+
+      {/* Click-a-gap: this boat's open start times */}
+      {slot && <SlotPeek boat={slot.boat} top={slot.top} onClose={onCloseSlot} onPick={onPickWindow} />}
+    </div>
+  );
+}
+
 function BoatRow({
   boat,
+  isTurnover,
   onLaneClick,
   onBlockClick,
 }: {
   boat: Boat;
+  isTurnover: boolean;
   onLaneClick: (e: React.MouseEvent<HTMLDivElement>) => void;
   onBlockClick: (r: Reservation) => void;
 }) {
   const res = reservationsForBoat(boat.id);
   const inService = boat.status === "in-service";
   const sc = statusConfig[boat.status as BoatStatus];
-  const isTurnover = turnovers.has(boat.id);
 
   const hourGrid =
     "repeating-linear-gradient(to right, transparent 0, transparent calc(" +
@@ -193,9 +245,9 @@ function BoatRow({
       {/* Label */}
       <div style={{ width: LABEL_W, opacity: inService ? 1 : 0.5 }} className="flex-shrink-0 px-3 py-2 border-r border-black/5 flex flex-col justify-center">
         <div className="flex items-center gap-1.5">
-          <span className="text-[13px] font-semibold text-black">{boat.name}</span>
+          <span className="text-[13px] font-semibold text-black leading-tight truncate">{boat.name}</span>
           {isTurnover && (
-            <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded-full">turn</span>
+            <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded-full flex-shrink-0">turn</span>
           )}
         </div>
         {boat.code && <span className="text-[10px] font-mono text-[#5C9A9E] font-semibold">{boat.code}</span>}
@@ -230,7 +282,7 @@ function BoatRow({
   );
 }
 
-function SlotPeek({ boat, top, onClose }: { boat: Boat; top: number; onClose: () => void }) {
+function SlotPeek({ boat, top, onClose, onPick }: { boat: Boat; top: number; onClose: () => void; onPick: (boat: Boat, start: number, duration: number) => void }) {
   const { half, full } = boatOpenWindows(boat.id);
   return (
     <div
@@ -238,21 +290,19 @@ function SlotPeek({ boat, top, onClose }: { boat: Boat; top: number; onClose: ()
       style={{ top, left: LABEL_W + 8, width: 380 }}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-semibold text-black">
-          Open start times · {boat.name}
-        </span>
+        <span className="text-[13px] font-semibold text-black">Open start times · {boat.name}</span>
         <button onClick={onClose} className="text-[#afafaf] hover:text-black text-sm leading-none">×</button>
       </div>
-      <p className="text-[10px] text-[#afafaf] mb-2">Tap a time to start the booking (booking screen coming next).</p>
-      <PeekRow label="Half day · 4h" wins={half} />
+      <p className="text-[10px] text-[#afafaf] mb-2">Tap a time to start the booking.</p>
+      <PeekRow label="Half day · 4h" wins={half} onPick={(s) => onPick(boat, s, HALF_MIN)} />
       <div className="mt-2">
-        <PeekRow label="Full day · 7h" wins={full} />
+        <PeekRow label="Full day · 7h" wins={full} onPick={(s) => onPick(boat, s, FULL_MIN)} />
       </div>
     </div>
   );
 }
 
-function PeekRow({ label, wins }: { label: string; wins: { start: number; end: number }[] }) {
+function PeekRow({ label, wins, onPick }: { label: string; wins: { start: number; end: number }[]; onPick: (start: number) => void }) {
   return (
     <div>
       <p className="text-[10px] text-[#afafaf] mb-1">{label}</p>
@@ -261,12 +311,315 @@ function PeekRow({ label, wins }: { label: string; wins: { start: number; end: n
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {wins.map((w) => (
-            <span key={w.start} className="px-2.5 py-1 rounded-full text-[11px] font-medium cursor-pointer whitespace-nowrap hover:brightness-95" style={{ background: teal.bg, border: `1px solid ${teal.border}`, color: teal.text }}>
+            <button
+              key={w.start}
+              onClick={() => onPick(w.start)}
+              className="px-2.5 py-1 rounded-full text-[11px] font-medium cursor-pointer whitespace-nowrap hover:brightness-95"
+              style={{ background: teal.bg, border: `1px solid ${teal.border}`, color: teal.text }}
+            >
               {fmtRange(w.start, w.end)}
-            </span>
+            </button>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Booking screen (Module 1) ────────────────────────────────────────────────
+function BookingScreen({ prefill, onClose, onBook }: { prefill: Prefill; onClose: () => void; onBook: (res: Reservation) => void }) {
+  const [category, setCategory] = useState(prefill.category ?? "Premium Pontoon");
+  const [duration, setDuration] = useState<number>(prefill.duration ?? FULL_MIN);
+  const [start, setStart] = useState<number | null>(prefill.start ?? null);
+  const [boatOverride, setBoatOverride] = useState<string | null>(prefill.boatId ?? null);
+  const [partySize, setPartySize] = useState(2);
+  const [eligibility, setEligibility] = useState<"license" | "senior" | null>(null);
+  const [bookerName, setBookerName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [captainMode, setCaptainMode] = useState<"same" | "named" | "tbd">("same");
+  const [captainName, setCaptainName] = useState("");
+  const [accessoryKeys, setAccessoryKeys] = useState<string[]>([]);
+  const [damageWaiver, setDamageWaiver] = useState(false);
+  const [cancellationInsurance, setCancellationInsurance] = useState(false);
+
+  // Derived (recomputed each render)
+  const windows = openWindows(category, duration);
+  const effStart = start != null && windows.some((w) => w.start === start) ? start : windows[0]?.start ?? null;
+  const hulls = effStart != null ? freeHulls(category, effStart, duration) : [];
+  const assignedBoat: Boat | null = (boatOverride && hulls.find((h) => h.id === boatOverride)) || hulls[0] || null;
+  const accessories = accessoriesForBoat(assignedBoat);
+  const validKeys = accessoryKeys.filter((k) => accessories.some((a) => a.key === k));
+  const q = quote({ category, duration, boat: assignedBoat, accessoryKeys: validKeys, damageWaiver, cancellationInsurance });
+  const cap = assignedBoat?.capacity ?? 0;
+  const overCap = partySize > cap;
+
+  const missing: string[] = [];
+  if (effStart == null || !assignedBoat) missing.push("an open time slot");
+  if (partySize < 1) missing.push("party size");
+  if (overCap) missing.push("party over capacity");
+  if (!eligibility) missing.push("driver eligibility");
+  if (!bookerName.trim()) missing.push("booker name");
+  if (captainMode === "named" && !captainName.trim()) missing.push("captain name");
+  const canBook = missing.length === 0;
+
+  const rate = RATES[category];
+  const toggleAccessory = (key: string) =>
+    setAccessoryKeys((keys) => (keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key]));
+
+  function book() {
+    if (!canBook || !assignedBoat || effStart == null) return;
+    const captainLabel = captainMode === "tbd" ? "TBD" : captainMode === "named" ? captainName.trim() : bookerName.trim();
+    const created = addReservation({
+      boatId: assignedBoat.id,
+      category,
+      start: effStart,
+      duration,
+      renter: bookerName.trim(), // the individual on the reservation
+      partySize,
+      booker: bookerName.trim(),
+      phone: phone.trim(),
+      captain: captainLabel,
+      accessories: validKeys,
+      damageWaiver,
+      cancellationInsurance,
+      total: q.total,
+    });
+    onBook(created);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center overflow-y-auto py-6 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-[880px] shadow-2xl overflow-hidden my-auto" onClick={(e) => e.stopPropagation()}>
+        {/* Header with live tax-inclusive total */}
+        <div className="flex items-center justify-between px-6 py-4 text-white" style={{ background: NAVY }}>
+          <div>
+            <p className="text-[#5C9A9E] text-[11px] font-semibold uppercase tracking-widest">New booking</p>
+            <p className="text-lg font-bold leading-tight">{DEMO_DATE_SHORT}, 2026 <span className="text-white/40 font-normal text-sm">· today</span></p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-2xl font-bold leading-none">{money(q.total)}</p>
+              <p className="text-white/50 text-[11px] mt-0.5">incl. {money(q.tax)} tax · {money(DEPOSIT)} deposit at arrival</p>
+            </div>
+            <button onClick={onClose} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Zone 1 — What & when */}
+          <Zone label="What & when">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Category">
+                <select value={category} onChange={(e) => { setCategory(e.target.value); setBoatOverride(null); setStart(null); }} className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm bg-white">
+                  {RENTAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+              <Field label="Duration">
+                <div className="flex gap-2">
+                  <DurBtn active={duration === FULL_MIN} onClick={() => { setDuration(FULL_MIN); setStart(null); }} title="Full day · 7h" price={rate ? money(rate.full) : "—"} />
+                  <DurBtn active={duration === HALF_MIN} onClick={() => { setDuration(HALF_MIN); setStart(null); }} title="Half day · 4h" price={rate ? money(rate.half) : "—"} />
+                </div>
+              </Field>
+              <Field label="Start window">
+                {windows.length === 0 ? (
+                  <div className="text-sm text-[#b23b3b] bg-[#fdecec] border border-[#f5c6c6] rounded-lg px-3 py-2">No open windows for this category · duration today.</div>
+                ) : (
+                  <select value={effStart ?? ""} onChange={(e) => { setStart(Number(e.target.value)); setBoatOverride(null); }} className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm bg-white">
+                    {windows.map((w) => <option key={w.start} value={w.start}>{fmtRange(w.start, w.end)}</option>)}
+                  </select>
+                )}
+              </Field>
+              <Field label="Boat assigned">
+                {assignedBoat ? (
+                  <div className="flex items-center gap-2">
+                    <select value={assignedBoat.id} onChange={(e) => setBoatOverride(e.target.value)} className="flex-1 border border-black/15 rounded-lg px-3 py-2 text-sm bg-white">
+                      {hulls.map((h) => <option key={h.id} value={h.id}>{h.name}{h.code ? ` (${h.code})` : ""}</option>)}
+                    </select>
+                    <span className="text-[11px] text-[#afafaf] whitespace-nowrap">auto-slotted</span>
+                  </div>
+                ) : (
+                  <div className="text-sm text-[#b23b3b] bg-[#fdecec] border border-[#f5c6c6] rounded-lg px-3 py-2">No boat open for this window.</div>
+                )}
+              </Field>
+            </div>
+          </Zone>
+
+          {/* Zone 2 — Who */}
+          <Zone label="Who">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Party size">
+                <div className="flex items-center gap-2">
+                  <input type="number" min={1} value={partySize} onChange={(e) => setPartySize(Math.max(1, Number(e.target.value) || 1))} className="w-20 border border-black/15 rounded-lg px-3 py-2 text-sm" />
+                  <span className={`text-sm font-medium ${overCap ? "text-[#b23b3b]" : "text-[#0F6E56]"}`}>
+                    {overCap ? `over capacity (max ${cap})` : assignedBoat ? `of ${cap} ✓` : ""}
+                  </span>
+                </div>
+              </Field>
+              <Field label="Driver eligible (PA law)">
+                <div className="flex gap-2">
+                  <PillBtn active={eligibility === "license"} onClick={() => setEligibility("license")}>Boater&apos;s license</PillBtn>
+                  <PillBtn active={eligibility === "senior"} onClick={() => setEligibility("senior")}>Born before 1982</PillBtn>
+                </div>
+              </Field>
+              <Field label="Booker / payer name">
+                <input value={bookerName} onChange={(e) => setBookerName(e.target.value)} placeholder="Individual on the reservation" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
+              </Field>
+              <Field label="Phone">
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="570-…" className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm" />
+              </Field>
+              <Field label="Captain (per boat)">
+                <div className="flex gap-2 items-center flex-wrap">
+                  <PillBtn active={captainMode === "same"} onClick={() => setCaptainMode("same")}>Same as booker</PillBtn>
+                  <PillBtn active={captainMode === "named"} onClick={() => setCaptainMode("named")}>Add captain</PillBtn>
+                  <PillBtn active={captainMode === "tbd"} onClick={() => setCaptainMode("tbd")}>TBD</PillBtn>
+                  {captainMode === "named" && (
+                    <input value={captainName} onChange={(e) => setCaptainName(e.target.value)} placeholder="Captain name" className="border border-black/15 rounded-lg px-3 py-2 text-sm flex-1 min-w-[140px]" />
+                  )}
+                </div>
+              </Field>
+            </div>
+          </Zone>
+
+          {/* Zone 3 — Add-ons */}
+          <Zone label="Add-ons">
+            <Field label={assignedBoat ? `Accessories (what ${assignedBoat.name} can pull)` : "Accessories"}>
+              {accessories.length === 0 ? (
+                <p className="text-[13px] text-[#afafaf]">No accessories available on this boat.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {accessories.map((a) => (
+                    <PillBtn key={a.key} active={validKeys.includes(a.key)} onClick={() => toggleAccessory(a.key)}>
+                      {a.key === "single-tube" ? "Single tube" : a.label} <span className="opacity-60">+{money(a.price)}</span>
+                    </PillBtn>
+                  ))}
+                </div>
+              )}
+            </Field>
+            <div className="grid grid-cols-2 gap-4 mt-3">
+              <ToggleCard active={damageWaiver} onClick={() => setDamageWaiver((v) => !v)} title={`Damage waiver +${money(DAMAGE_WAIVER)}`} desc="Covers head-on collisions only." />
+              <ToggleCard active={cancellationInsurance} onClick={() => setCancellationInsurance((v) => !v)} title={`Cancellation insurance +${money(CANCELLATION_INS)}`} desc={cancellationInsurance ? "Cancel up to 2 days before (9am) for a full refund." : "Declined — standard cancellation policy applies."} />
+            </div>
+          </Zone>
+
+          {/* Zone 4 — Pay */}
+          <Zone label="Pay">
+            <div className="bg-[#fafafa] rounded-xl p-4 text-sm">
+              <Line label={`${category} · ${duration === FULL_MIN ? "Full day (7h)" : "Half day (4h)"}`} value={money(q.base)} />
+              {validKeys.map((k) => {
+                const a = accessories.find((x) => x.key === k)!;
+                return <Line key={k} label={a.label} value={money(a.price)} muted />;
+              })}
+              {damageWaiver && <Line label="Damage waiver" value={money(DAMAGE_WAIVER)} muted />}
+              {cancellationInsurance && <Line label="Cancellation insurance" value={money(CANCELLATION_INS)} muted />}
+              <div className="border-t border-black/10 my-2" />
+              <Line label="Subtotal" value={money(q.subtotal)} muted />
+              <Line label="Tax (6%)" value={money(q.tax)} muted />
+              <div className="flex items-center justify-between mt-2">
+                <span className="font-bold text-[#081731]">Total (tax incl.)</span>
+                <span className="font-bold text-[#081731] text-lg">{money(q.total)}</span>
+              </div>
+              <p className="text-[11px] text-[#afafaf] mt-2">{money(DEPOSIT)} refundable security deposit collected at arrival — not now.</p>
+            </div>
+          </Zone>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-[12px] text-[#afafaf]">
+              {canBook ? "Charge card on file to confirm." : `Still needed: ${missing.join(", ")}.`}
+            </p>
+            <button
+              onClick={book}
+              disabled={!canBook}
+              className="text-sm font-semibold px-6 py-2.5 rounded-full text-white transition-colors"
+              style={{ background: canBook ? NAVY : "#c9ccd2", cursor: canBook ? "pointer" : "not-allowed" }}
+            >
+              Book it · {money(q.total)} →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Zone({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="border border-black/8 rounded-xl p-4">
+      <p className="text-[11px] font-semibold text-[#afafaf] uppercase tracking-widest mb-3">{label}</p>
+      {children}
+    </div>
+  );
+}
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[12px] font-medium text-[#4b4b4b] mb-1.5">{label}</p>
+      {children}
+    </div>
+  );
+}
+function DurBtn({ active, onClick, title, price }: { active: boolean; onClick: () => void; title: string; price: string }) {
+  return (
+    <button onClick={onClick} className="flex-1 rounded-lg border px-3 py-2 text-left transition-colors" style={{ background: active ? teal.bg : "#fff", borderColor: active ? teal.border : "rgba(0,0,0,0.15)" }}>
+      <span className="block text-[12px] font-semibold" style={{ color: active ? teal.text : "#000" }}>{title}</span>
+      <span className="block text-[12px]" style={{ color: active ? teal.text : "#afafaf" }}>{price}</span>
+    </button>
+  );
+}
+function PillBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className="px-3 py-1.5 rounded-full text-[13px] font-medium border transition-colors" style={{ background: active ? teal.bg : "#fff", borderColor: active ? teal.border : "rgba(0,0,0,0.15)", color: active ? teal.text : "#4b4b4b" }}>
+      {children}
+    </button>
+  );
+}
+function ToggleCard({ active, onClick, title, desc }: { active: boolean; onClick: () => void; title: string; desc: string }) {
+  return (
+    <button onClick={onClick} className="text-left rounded-lg border px-3 py-2.5 transition-colors" style={{ background: active ? teal.bg : "#fff", borderColor: active ? teal.border : "rgba(0,0,0,0.15)" }}>
+      <span className="block text-[13px] font-semibold" style={{ color: active ? teal.text : "#000" }}>{title}</span>
+      <span className="block text-[11px] mt-0.5" style={{ color: active ? teal.text : "#afafaf" }}>{desc}</span>
+    </button>
+  );
+}
+function Line({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <span className={muted ? "text-[#6b6b6b]" : "text-black font-medium"}>{label}</span>
+      <span className={muted ? "text-[#6b6b6b]" : "text-black font-medium"}>{value}</span>
+    </div>
+  );
+}
+
+function Confirmation({ res, onDone }: { res: Reservation; onDone: () => void }) {
+  const boat = boatById(res.boatId);
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center px-4" onClick={onDone}>
+      <div className="bg-white rounded-2xl w-full max-w-[440px] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-5 text-white" style={{ background: NAVY }}>
+          <div className="flex items-center gap-2.5">
+            <span className="flex items-center justify-center w-7 h-7 rounded-full" style={{ background: teal.border }}>
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            </span>
+            <div>
+              <p className="text-[11px] font-mono font-bold uppercase tracking-widest text-[#5C9A9E]">{res.id}</p>
+              <h2 className="text-xl font-bold leading-tight">Booking confirmed</h2>
+            </div>
+          </div>
+        </div>
+        <div className="p-6 space-y-2.5 text-sm">
+          <Line label="Name" value={res.renter} muted />
+          <Line label="Boat" value={boat ? `${boat.name}${boat.code ? ` (${boat.code})` : ""}` : "—"} muted />
+          <Line label="Time" value={fmtRange(res.start, resEnd(res))} muted />
+          <Line label="Party" value={`${res.partySize} of ${boat?.capacity ?? "—"}`} muted />
+          <Line label="Charged" value={money(res.total ?? 0)} />
+          <div className="bg-[#f0f7fb] border border-[#d0e8f5] rounded-xl p-3 mt-2">
+            <p className="text-[12px] text-[#2A5B7D] leading-relaxed">
+              Tell them to <b>arrive 45 minutes early</b> to sign the waiver, put down the {money(DEPOSIT)} deposit, and get set up. Waiver + reminder emails go out ahead of the date — signing at home saves ~5 min at the desk.
+            </p>
+          </div>
+          <button onClick={onDone} className="w-full mt-2 text-sm font-semibold px-6 py-2.5 rounded-full text-white" style={{ background: NAVY }}>Done</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -300,7 +653,9 @@ function ReservationDetail({ res, onClose }: { res: Reservation; onClose: () => 
           <DRow label="Length" value={dur} />
           <DRow label="Boat assigned" value={boat ? `${boat.name}${boat.code ? ` (${boat.code})` : ""}` : "—"} />
           <DRow label="Category" value={res.category} />
-          <DRow label="Captain" value={res.renter} />
+          {res.partySize != null && <DRow label="Party size" value={`${res.partySize}${boat ? ` of ${boat.capacity}` : ""}`} />}
+          <DRow label="Captain" value={res.captain ?? res.renter} />
+          {res.total != null && <DRow label="Charged" value={money(res.total)} />}
 
           <div className="bg-[#f0f7fb] border border-[#d0e8f5] rounded-xl p-3 mt-2">
             <p className="text-[11px] text-[#2A5B7D] leading-relaxed">
