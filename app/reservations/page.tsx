@@ -91,21 +91,29 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      {/* Day snapshot (the plan) + live state (right now) */}
-      <div className="mb-5">
-        <p className="text-[13px] text-[#6b6b6b] mb-2">
-          <span className="font-bold text-black tabular-nums">{live.reservationsToday}</span> reservations today
-          <span className="text-[#cbd5e1] mx-2">·</span>
-          <span className="font-bold text-black tabular-nums">{live.turnovers}</span> turnovers
+      {/* Headline — Option A: day-shape caption + hero (on the water) + detail */}
+      <div className="mb-5 inline-flex flex-col bg-white rounded-xl px-5 py-4 shadow-[rgba(0,0,0,0.08)_0px_4px_16px]">
+        <p className="text-[13px] text-[#6b6b6b] mb-3">
+          <span className="font-semibold text-black tabular-nums">{live.reservationsToday}</span> reservations today
+          <span className="text-[#d4d4d4] mx-2">·</span>
+          <span className="font-semibold text-black tabular-nums">{live.turnovers}</span> turnovers
         </p>
-        <div className="inline-flex flex-col bg-white rounded-xl px-5 py-3.5 shadow-[rgba(0,0,0,0.08)_0px_4px_16px]">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[34px] font-bold leading-none tabular-nums" style={{ color: stageConfig["on-water"].text }}>{live.onWater}</span>
-            <span className="text-sm font-semibold text-[#4b4b4b]">on the water</span>
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col">
+            <span className="text-[44px] font-bold leading-none tabular-nums" style={{ color: stageConfig["on-water"].text }}>{live.onWater}</span>
+            <span className="text-[13px] text-[#6b6b6b] mt-1.5">on the water</span>
           </div>
-          <p className="text-[12px] text-[#afafaf] mt-1.5 tabular-nums">
-            {live.toGoOut} to go out · {live.toFinalize} to finalize
-          </p>
+          <div className="self-stretch w-px bg-black/10" />
+          <div className="flex flex-col gap-2.5">
+            <span className="text-[14px] text-[#1a1a1a] flex items-center">
+              <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: "#94a3b8" }} />
+              <span className="font-semibold tabular-nums mr-1">{live.toGoOut}</span> to go out
+            </span>
+            <span className="text-[14px] text-[#1a1a1a] flex items-center">
+              <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: stageConfig.returned.dot }} />
+              <span className="font-semibold tabular-nums mr-1">{live.toFinalize}</span> to finalize
+            </span>
+          </div>
         </div>
       </div>
 
