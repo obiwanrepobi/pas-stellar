@@ -849,12 +849,12 @@ function NotesPanel({ incidents, setIncidents, notes, onToggle, onDelete, onAdd,
   text: string; setText: (v: string) => void; who: string; setWho: (v: string) => void;
 }) {
   return (
-    <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col">
+    <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col h-[560px]">
       <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
         <span className="text-[13px] font-semibold text-black">Notes &amp; to-dos</span>
         <span className="text-[11px] text-[#afafaf]">ongoing</span>
       </div>
-      <div className="flex-1 overflow-y-auto max-h-[460px]">
+      <div className="flex-1 overflow-y-auto">
         <HeadsUp incidents={incidents} setIncidents={setIncidents} />
         <div className="px-4 pt-3 pb-1">
           <p className="text-[11px] font-medium text-[#afafaf] mb-1">To-dos</p>
@@ -886,7 +886,7 @@ function NotesPanel({ incidents, setIncidents, notes, onToggle, onDelete, onAdd,
 function DispatchPanel({ status, onCycle }: { status: Record<string, number>; onCycle: (id: string) => void }) {
   const rows = [...reservations].sort((a, b) => a.start - b.start);
   return (
-    <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col">
+    <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col h-[560px]">
       <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
         <span className="text-[13px] font-semibold text-black">Today&apos;s dispatch <span className="text-[11px] font-normal text-[#afafaf]">· {rows.length} going out</span></span>
         <button disabled title="Prints / sends the crew sheet to the dock (disabled in the demo)" className="text-[12px] font-medium text-[#9aa0a6] border border-black/10 rounded-full px-3 py-1 cursor-default">Print / Send</button>
