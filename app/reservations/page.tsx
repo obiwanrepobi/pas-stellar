@@ -74,20 +74,24 @@ const SEED_NOTES: Note[] = [
 ];
 
 type HandledItem = { id: number; text: string; done: boolean };
-type Incident = { id: number; boat: string; title: string; date: string; summary: string; handled: HandledItem[]; next: string };
+type Incident = { id: number; boat: string; title: string; date: string; summary: string; handled: HandledItem[]; next: HandledItem[] };
 const SEED_INCIDENTS: Incident[] = [
   {
     id: 1,
     boat: "Belize · PP5",
     title: "prop damage",
-    date: "Fri, Jul 17",
+    date: "2026-07-17",
     summary: "Damaged on Friday's afternoon rental. Dave had it pulled that night — service is aware.",
     handled: [
       { id: 1, text: "Rentals Jul 18–20 moved to other boats", done: true },
       { id: 2, text: "Blocked on the calendar through the week", done: true },
       { id: 3, text: "Before/after photos taken — see booking notes", done: true },
     ],
-    next: "Get repair estimate from Sue → call the customer",
+    next: [
+      { id: 1, text: "Get repair estimate from Sue", done: false },
+      { id: 2, text: "Call the customer once you have the estimate", done: false },
+      { id: 3, text: "Square it up + take Belize out of service in Fleet Management", done: false },
+    ],
   },
 ];
 
@@ -128,6 +132,8 @@ export default function ReservationsPage() {
   const [dispatchStatus, setDispatchStatus] = useState<Record<string, number>>({});
   const [view, setView] = useState("day");
   const [winStart, setWinStart] = useState(0);
+  const [notesMin, setNotesMin] = useState(false);
+  const [dispatchMin, setDispatchMin] = useState(false);
 
   const addNote = () => {
     const t = noteText.trim();
@@ -168,42 +174,32 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      {/* Top bar: day summary (left) + typical-slots toggle (right) — one full-width bar */}
-      <div className="mb-5 bg-white rounded-xl px-5 py-4 shadow-[rgba(0,0,0,0.08)_0px_4px_16px]">
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div>
-            <p className="text-[13px] text-[#6b6b6b] mb-3">
-              <span className="font-semibold text-black tabular-nums">{live.reservationsToday}</span> reservations today
-              <span className="text-[#d4d4d4] mx-2">·</span>
-              <span className="font-semibold text-black tabular-nums">{live.turnovers}</span> turnovers
-            </p>
-            <div className="flex items-center gap-6">
-              <div className="flex flex-col">
-                <span className="text-[44px] font-bold leading-none tabular-nums" style={{ color: stageConfig["on-water"].text }}>{live.onWater}</span>
-                <span className="text-[13px] text-[#6b6b6b] mt-1.5">on the water</span>
-              </div>
-              <div className="self-stretch w-px bg-black/10" />
-              <div className="flex flex-col gap-2.5">
-                <span className="text-[14px] text-[#1a1a1a] flex items-center">
-                  <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: "#94a3b8" }} />
-                  <span className="font-semibold tabular-nums mr-1">{live.toGoOut}</span> to go out
-                </span>
-                <span className="text-[14px] text-[#1a1a1a] flex items-center">
-                  <span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: stageConfig.returned.dot }} />
-                  <span className="font-semibold tabular-nums mr-1">{live.toFinalize}</span> to finalize
-                </span>
-              </div>
-            </div>
+      {/* Day rail — hero left, day story across the middle, controls docked right */}
+      <div className="mb-5 bg-white rounded-xl px-6 py-4 shadow-[rgba(0,0,0,0.08)_0px_4px_16px]">
+        <div className="flex items-center gap-6 flex-wrap">
+          <div className="flex flex-col">
+            <span className="text-[42px] font-bold leading-none tabular-nums" style={{ color: stageConfig["on-water"].text }}>{live.onWater}</span>
+            <span className="text-[13px] text-[#6b6b6b] mt-1">on the water</span>
           </div>
+          <div className="self-stretch w-px bg-black/10" />
+          <div className="flex flex-col gap-1 text-[13px] text-[#6b6b6b]">
+            <span><span className="font-semibold text-black tabular-nums">{live.reservationsToday}</span> reservations today</span>
+            <span><span className="font-semibold text-black tabular-nums">{live.turnovers}</span> turnovers</span>
+          </div>
+          <div className="self-stretch w-px bg-black/10" />
+          <div className="flex flex-col gap-1.5 text-[13px] text-[#1a1a1a]">
+            <span className="flex items-center"><span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: "#94a3b8" }} /><span className="font-semibold tabular-nums mr-1">{live.toGoOut}</span> to go out</span>
+            <span className="flex items-center"><span className="w-2.5 h-2.5 rounded-full mr-2" style={{ background: stageConfig.returned.dot }} /><span className="font-semibold tabular-nums mr-1">{live.toFinalize}</span> to finalize</span>
+          </div>
+          <div className="flex-1 min-w-[16px]" />
           <button
             onClick={() => setCardOpen((v) => !v)}
-            className="flex items-center gap-2 text-sm font-semibold text-black hover:text-[#0F6E56] transition-colors self-start"
+            className="flex items-center gap-2 text-[13px] font-medium text-[#4b4b4b] border border-black/15 rounded-lg px-3 py-2 hover:bg-[#fafafa] transition-colors"
           >
             <svg className={`w-3.5 h-3.5 text-[#5C9A9E] transition-transform ${cardOpen ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
             Typical time slots
-            <span className="text-[11px] font-normal text-[#afafaf]">reference</span>
           </button>
         </div>
         {cardOpen && (
@@ -214,9 +210,9 @@ export default function ReservationsPage() {
       </div>
 
       {/* Notes | Dispatch strip (above the grid) */}
-      <div className="grid grid-cols-2 gap-4 mb-5">
-        <NotesPanel incidents={incidents} setIncidents={setIncidents} notes={notes} onToggle={toggleNote} onDelete={deleteNote} onAdd={addNote} text={noteText} setText={setNoteText} who={noteWho} setWho={setNoteWho} />
-        <DispatchPanel status={dispatchStatus} onCycle={cycleDispatch} />
+      <div className="grid grid-cols-2 gap-4 mb-5 items-start">
+        <NotesPanel minimized={notesMin} onToggleMin={() => setNotesMin((v) => !v)} incidents={incidents} setIncidents={setIncidents} notes={notes} onToggle={toggleNote} onDelete={deleteNote} onAdd={addNote} text={noteText} setText={setNoteText} who={noteWho} setWho={setNoteWho} />
+        <DispatchPanel minimized={dispatchMin} onToggleMin={() => setDispatchMin((v) => !v)} status={dispatchStatus} onCycle={cycleDispatch} />
       </div>
 
       {/* Grid time-range toggle + date nav */}
@@ -851,11 +847,24 @@ const edCls = "bg-transparent rounded px-1 -mx-1 outline-none hover:bg-black/[0.
 
 function HeadsUp({ incidents, setIncidents }: { incidents: Incident[]; setIncidents: React.Dispatch<React.SetStateAction<Incident[]>> }) {
   const upd = (id: number, p: Partial<Incident>) => setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, ...p } : x)));
-  const updH = (id: number, itemId: number, p: Partial<HandledItem>) => setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, handled: x.handled.map((h) => (h.id === itemId ? { ...h, ...p } : h)) } : x)));
-  const addH = (id: number) => setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, handled: [...x.handled, { id: Date.now(), text: "", done: true }] } : x)));
-  const removeH = (id: number, itemId: number) => setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, handled: x.handled.filter((h) => h.id !== itemId) } : x)));
+  const updItem = (id: number, key: "handled" | "next", itemId: number, p: Partial<HandledItem>) =>
+    setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, [key]: x[key].map((h) => (h.id === itemId ? { ...h, ...p } : h)) } : x)));
+  const addItem = (id: number, key: "handled" | "next") =>
+    setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, [key]: [...x[key], { id: Date.now(), text: "", done: key === "handled" }] } : x)));
+  const removeItem = (id: number, key: "handled" | "next", itemId: number) =>
+    setIncidents((xs) => xs.map((x) => (x.id === id ? { ...x, [key]: x[key].filter((h) => h.id !== itemId) } : x)));
   const dismiss = (id: number) => setIncidents((xs) => xs.filter((x) => x.id !== id));
-  const add = () => setIncidents((xs) => [...xs, { id: Date.now(), boat: "", title: "", date: "", summary: "", handled: [], next: "" }]);
+  const add = () => setIncidents((xs) => [...xs, { id: Date.now(), boat: "", title: "", date: "", summary: "", handled: [], next: [] }]);
+
+  const itemRow = (inc: Incident, key: "handled" | "next", h: HandledItem) => (
+    <div key={h.id} className="group/h flex items-center gap-1.5">
+      <button onClick={() => updItem(inc.id, key, h.id, { done: !h.done })} className="w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: h.done ? "#10b981" : "transparent", border: h.done ? "none" : "1px solid #d4a72c" }}>
+        {h.done && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+      </button>
+      <input value={h.text} onChange={(e) => updItem(inc.id, key, h.id, { text: e.target.value })} placeholder={key === "handled" ? "what was handled" : "what still needs doing"} className={`text-[12px] ${h.done ? "text-[#6b5320] line-through" : "text-[#5a4300]"} flex-1 min-w-0 ${edCls}`} />
+      <button onClick={() => removeItem(inc.id, key, h.id)} className="opacity-0 group-hover/h:opacity-100 text-[#d4a72c] hover:text-[#b23b3b] text-sm leading-none flex-shrink-0 transition-opacity">×</button>
+    </div>
+  );
 
   return (
     <div className="px-4 pt-3">
@@ -868,30 +877,33 @@ function HeadsUp({ incidents, setIncidents }: { incidents: Incident[]; setIncide
       ) : (
         incidents.map((inc) => (
           <div key={inc.id} className="rounded-[10px] p-3 mb-2" style={{ background: "#fef3c7", border: "1px solid #fcd34d" }}>
-            <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="flex items-center gap-1.5 mb-2">
               <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.48 14.7A1 1 0 002.67 20h18.66a1 1 0 00.86-1.44l-8.48-14.7a1 1 0 00-1.72 0z" /></svg>
-              <input value={inc.boat} onChange={(e) => upd(inc.id, { boat: e.target.value })} placeholder="Boat" className={`text-[13px] font-semibold text-[#78350f] w-32 ${edCls}`} />
-              <input value={inc.title} onChange={(e) => upd(inc.id, { title: e.target.value })} placeholder="what happened" className={`text-[12px] text-[#92600f] flex-1 min-w-0 ${edCls}`} />
-              <input value={inc.date} onChange={(e) => upd(inc.id, { date: e.target.value })} placeholder="date" className={`text-[11px] text-[#b07d1a] w-24 text-right ${edCls}`} />
+              <select value={inc.boat} onChange={(e) => upd(inc.id, { boat: e.target.value })} className={`text-[13px] font-semibold text-[#78350f] w-36 ${edCls}`}>
+                <option value="">Select boat…</option>
+                {fleetBoats.map((b) => { const v = `${b.name}${b.code ? ` · ${b.code}` : ""}`; return <option key={b.id} value={v}>{v}</option>; })}
+              </select>
+              <input value={inc.title} onChange={(e) => upd(inc.id, { title: e.target.value })} placeholder="type of issue (e.g. prop damage)" className={`text-[12px] text-[#92600f] flex-1 min-w-0 ${edCls}`} />
+              <input type="date" value={inc.date} onChange={(e) => upd(inc.id, { date: e.target.value })} className={`text-[11px] text-[#b07d1a] w-[132px] ${edCls}`} />
               <button onClick={() => dismiss(inc.id)} title="Dismiss" className="text-[#d4a72c] hover:text-[#b23b3b] text-base leading-none flex-shrink-0">×</button>
             </div>
-            <textarea value={inc.summary} onChange={(e) => upd(inc.id, { summary: e.target.value })} rows={2} placeholder="What happened…" className={`text-[13px] text-[#5a4300] w-full resize-none leading-snug mb-2 ${edCls}`} />
-            <div className="flex flex-col gap-1 mb-2">
-              {inc.handled.map((h) => (
-                <div key={h.id} className="group/h flex items-center gap-1.5">
-                  <button onClick={() => updH(inc.id, h.id, { done: !h.done })} className="w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: h.done ? "#10b981" : "transparent", border: h.done ? "none" : "1px solid #d4a72c" }}>
-                    {h.done && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-                  </button>
-                  <input value={h.text} onChange={(e) => updH(inc.id, h.id, { text: e.target.value })} placeholder="handled item" className={`text-[12px] text-[#6b5320] flex-1 min-w-0 ${edCls}`} />
-                  <button onClick={() => removeH(inc.id, h.id)} className="opacity-0 group-hover/h:opacity-100 text-[#d4a72c] hover:text-[#b23b3b] text-sm leading-none flex-shrink-0 transition-opacity">×</button>
-                </div>
-              ))}
-              <button onClick={() => addH(inc.id)} className="text-[11px] text-[#b07d1a] hover:text-[#78350f] self-start ml-5">+ handled item</button>
+            <textarea value={inc.summary} onChange={(e) => upd(inc.id, { summary: e.target.value })} rows={2} placeholder="What happened — the full story…" className={`text-[13px] text-[#5a4300] w-full resize-none leading-snug mb-2.5 ${edCls}`} />
+
+            <p className="text-[10px] font-semibold text-[#b07d1a] uppercase tracking-wide mb-1">Handled</p>
+            <div className="flex flex-col gap-1 mb-2.5">
+              {inc.handled.map((h) => itemRow(inc, "handled", h))}
+              <button onClick={() => addItem(inc.id, "handled")} className="text-[11px] text-[#b07d1a] hover:text-[#78350f] self-start ml-5">+ handled item</button>
             </div>
-            <div className="flex items-center gap-1.5 pt-2 border-t border-[#fcd34d]">
-              <span className="text-[12px] font-semibold text-[#78350f] flex-shrink-0">Next:</span>
-              <input value={inc.next} onChange={(e) => upd(inc.id, { next: e.target.value })} placeholder="follow-up…" className={`text-[12px] text-[#78350f] flex-1 min-w-0 ${edCls}`} />
-              <span className="text-[11px] text-[#5C9A9E] whitespace-nowrap flex-shrink-0 cursor-pointer">View booking →</span>
+
+            <div className="pt-2.5 border-t border-[#fcd34d]">
+              <p className="text-[10px] font-semibold text-[#b07d1a] uppercase tracking-wide mb-1">Next steps</p>
+              <div className="flex flex-col gap-1">
+                {inc.next.map((h) => itemRow(inc, "next", h))}
+                <button onClick={() => addItem(inc.id, "next")} className="text-[11px] text-[#b07d1a] hover:text-[#78350f] self-start ml-5">+ next step</button>
+              </div>
+              <div className="flex justify-end mt-2">
+                <span className="text-[11px] text-[#5C9A9E] whitespace-nowrap cursor-pointer">View booking →</span>
+              </div>
             </div>
           </div>
         ))
@@ -900,17 +912,23 @@ function HeadsUp({ incidents, setIncidents }: { incidents: Incident[]; setIncide
   );
 }
 
-function NotesPanel({ incidents, setIncidents, notes, onToggle, onDelete, onAdd, text, setText, who, setWho }: {
+function NotesPanel({ minimized, onToggleMin, incidents, setIncidents, notes, onToggle, onDelete, onAdd, text, setText, who, setWho }: {
+  minimized: boolean; onToggleMin: () => void;
   incidents: Incident[]; setIncidents: React.Dispatch<React.SetStateAction<Incident[]>>;
   notes: Note[]; onToggle: (id: number) => void; onDelete: (id: number) => void; onAdd: () => void;
   text: string; setText: (v: string) => void; who: string; setWho: (v: string) => void;
 }) {
+  const openTodos = notes.filter((n) => !n.done).length;
   return (
-    <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col h-[560px]">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
-        <span className="text-[13px] font-semibold text-black">Notes &amp; to-dos</span>
-        <span className="text-[11px] text-[#afafaf]">ongoing</span>
+    <div className={`bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col ${minimized ? "" : "h-[560px]"}`}>
+      <div className={`flex items-center justify-between px-4 py-3 ${minimized ? "" : "border-b border-black/5"}`}>
+        <span className="text-[13px] font-semibold text-black">Notes &amp; to-dos{minimized && <span className="text-[11px] font-normal text-[#afafaf]"> · {incidents.length} heads-up, {openTodos} to-dos</span>}</span>
+        <div className="flex items-center gap-3">
+          {!minimized && <span className="text-[11px] text-[#afafaf]">ongoing</span>}
+          <button onClick={onToggleMin} title={minimized ? "Expand" : "Minimize"} aria-label={minimized ? "Expand" : "Minimize"} className="w-5 h-5 flex items-center justify-center text-[#9aa0a6] hover:text-black text-base leading-none">{minimized ? "+" : "–"}</button>
+        </div>
       </div>
+      {!minimized && (<>
       <div className="flex-1 overflow-y-auto">
         <HeadsUp incidents={incidents} setIncidents={setIncidents} />
         <div className="px-4 pt-3 pb-1">
@@ -936,18 +954,23 @@ function NotesPanel({ incidents, setIncidents, notes, onToggle, onDelete, onAdd,
         </select>
         <button onClick={onAdd} className="text-[13px] font-medium text-white bg-black rounded-full px-3.5 py-1.5 hover:bg-[#1a1a1a]">Add</button>
       </div>
+      </>)}
     </div>
   );
 }
 
-function DispatchPanel({ status, onCycle }: { status: Record<string, number>; onCycle: (id: string) => void }) {
+function DispatchPanel({ minimized, onToggleMin, status, onCycle }: { minimized: boolean; onToggleMin: () => void; status: Record<string, number>; onCycle: (id: string) => void }) {
   const rows = todaysReservations().sort((a, b) => a.start - b.start);
   return (
-    <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col h-[560px]">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
+    <div className={`bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col ${minimized ? "" : "h-[560px]"}`}>
+      <div className={`flex items-center justify-between px-4 py-3 ${minimized ? "" : "border-b border-black/5"}`}>
         <span className="text-[13px] font-semibold text-black">Today&apos;s dispatch <span className="text-[11px] font-normal text-[#afafaf]">· {rows.length} going out</span></span>
-        <button disabled title="Prints / sends the crew sheet to the dock (disabled in the demo)" className="text-[12px] font-medium text-[#9aa0a6] border border-black/10 rounded-full px-3 py-1 cursor-default">Print / Send</button>
+        <div className="flex items-center gap-3">
+          {!minimized && <button disabled title="Prints / sends the crew sheet to the dock (disabled in the demo)" className="text-[12px] font-medium text-[#9aa0a6] border border-black/10 rounded-full px-3 py-1 cursor-default">Print / Send</button>}
+          <button onClick={onToggleMin} title={minimized ? "Expand" : "Minimize"} aria-label={minimized ? "Expand" : "Minimize"} className="w-5 h-5 flex items-center justify-center text-[#9aa0a6] hover:text-black text-base leading-none">{minimized ? "+" : "–"}</button>
+        </div>
       </div>
+      {!minimized && (
       <div className="flex-1 overflow-y-auto">
         {rows.map((r) => {
           const boat = boatById(r.boatId);
@@ -973,6 +996,7 @@ function DispatchPanel({ status, onCycle }: { status: Record<string, number>; on
           );
         })}
       </div>
+      )}
     </div>
   );
 }
