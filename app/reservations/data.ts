@@ -79,6 +79,7 @@ export interface Reservation {
   start: number; // minutes from midnight
   duration: number; // HALF_MIN | FULL_MIN
   renter: string; // reservation name — ALWAYS one individual, never a party/family name
+  d?: number; // day offset from the demo day (Sat Jul 18 = 0); absent = today
   stage?: ReservationStage; // if absent, derived from time (see deriveStage)
   // Optional booking-screen fields (present on newly-created bookings)
   partySize?: number;
@@ -100,8 +101,36 @@ export const resEnd = (r: Reservation) => r.start + r.duration;
 // upcoming → reserved, spanning now → on the water, past → returned.
 export const stageOf = (r: Reservation): ReservationStage =>
   r.stage ?? (r.start > NOW_MIN ? "reserved" : resEnd(r) > NOW_MIN ? "on-water" : "returned");
+
+// Day-offset helpers (multi-day calendar). Absence of `d` = today (0).
+export const dayOf = (r: Reservation) => r.d ?? 0;
+// Coloring across days: future days are upcoming (reserved), past days are done
+// (finalized), today uses the live time-derived stage.
+export const boardStage = (r: Reservation): ReservationStage => {
+  const d = dayOf(r);
+  if (d > 0) return r.stage ?? "reserved";
+  if (d < 0) return r.stage ?? "finalized";
+  return stageOf(r);
+};
+export const todaysReservations = () => reservations.filter((r) => dayOf(r) === 0);
+// "Today" surfaces (day board, availability, dispatch, metrics) use only d===0.
 export const reservationsForBoat = (boatId: string) =>
-  reservations.filter((r) => r.boatId === boatId);
+  reservations.filter((r) => r.boatId === boatId && dayOf(r) === 0);
+// The zoomed calendar views use a day-range window across the whole fleet history.
+export const reservationsForBoatInRange = (boatId: string, dStart: number, dEnd: number) =>
+  reservations.filter((r) => r.boatId === boatId && dayOf(r) >= dStart && dayOf(r) < dEnd);
+
+// Calendar math off the frozen demo day (Sat, Jul 18, 2026). Deterministic.
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export function dateForOffset(d: number): Date {
+  return new Date(2026, 6, 18 + d);
+}
+export function dayMeta(d: number) {
+  const dt = dateForOffset(d);
+  return { weekday: WEEKDAYS[dt.getDay()], day: dt.getDate(), month: MONTHS[dt.getMonth()], monthIdx: dt.getMonth(), dow: dt.getDay() };
+}
+export const dayLabel = (d: number) => { const m = dayMeta(d); return `${m.month} ${m.day}`; };
 
 const m = (h: number, min = 0) => h * 60 + min;
 
@@ -166,23 +195,22 @@ export function openWindows(
 
 // ─── Headline counts (computed, so they never disagree with the board) ─────────
 export function dayCounts() {
+  const today = todaysReservations();
   const perBoat: Record<string, number> = {};
-  reservations.forEach((r) => {
+  today.forEach((r) => {
     perBoat[r.boatId] = (perBoat[r.boatId] || 0) + 1;
   });
   const outToday = Object.keys(perBoat).length;
   const turnovers = Object.values(perBoat).filter((n) => n >= 2).length;
   const stillOut = new Set(
-    reservations
-      .filter((r) => r.start <= NOW_MIN && resEnd(r) > NOW_MIN)
-      .map((r) => r.boatId)
+    today.filter((r) => r.start <= NOW_MIN && resEnd(r) > NOW_MIN).map((r) => r.boatId)
   ).size;
   return { outToday, turnovers, stillOut };
 }
 
 export const turnoverBoatIds = (): Set<string> => {
   const perBoat: Record<string, number> = {};
-  reservations.forEach((r) => {
+  todaysReservations().forEach((r) => {
     perBoat[r.boatId] = (perBoat[r.boatId] || 0) + 1;
   });
   return new Set(Object.keys(perBoat).filter((id) => perBoat[id] >= 2));
@@ -191,17 +219,18 @@ export const turnoverBoatIds = (): Set<string> => {
 // Live headline metrics. Day shape (reservationsToday, turnovers) is the plan;
 // the rest move through the day as stages change.
 export function liveCounts() {
+  const today = todaysReservations();
   const perBoat: Record<string, number> = {};
-  reservations.forEach((r) => { perBoat[r.boatId] = (perBoat[r.boatId] || 0) + 1; });
+  today.forEach((r) => { perBoat[r.boatId] = (perBoat[r.boatId] || 0) + 1; });
   const turnovers = Object.values(perBoat).filter((n) => n >= 2).length;
   let toGoOut = 0, onWater = 0, toFinalize = 0;
-  reservations.forEach((r) => {
+  today.forEach((r) => {
     const s = stageOf(r);
     if (s === "reserved" || s === "queued") toGoOut++;
     else if (s === "on-water") onWater++;
     else if (s === "returned") toFinalize++;
   });
-  return { reservationsToday: reservations.length, turnovers, toGoOut, onWater, toFinalize };
+  return { reservationsToday: today.length, turnovers, toGoOut, onWater, toFinalize };
 }
 
 // Rentable fleet grouped by category (in display order), including OOS/flagged
@@ -319,3 +348,34 @@ export function addReservation(r: Omit<Reservation, "id">): Reservation {
   reservations.push(created);
   return created;
 }
+
+// ─── Multi-day mock fill (for the zoomed calendar views) ──────────────────────
+// Deterministic (no randomness) so the demo is stable. Today (d===0) keeps the
+// hand-crafted set above; this fills the surrounding weeks/months, busier on
+// weekends. These never affect today's metrics/dispatch/availability (all d===0).
+(function seedCalendar() {
+  const idx = (n: number, len: number) => ((n % len) + len) % len;
+  const rentable = fleetBoats.filter((b) => RENTAL_CATEGORIES.includes(b.category) && b.status === "in-service");
+  const names = ["A. Brooks", "J. Rivera", "M. Cole", "T. Nguyen", "S. Patel", "R. Kim", "D. Flores", "L. Owens", "C. Ramos", "B. Foster", "H. Ward", "N. Reyes", "P. Shaw", "G. Diaz", "K. Boone", "V. Cruz", "E. Hale", "W. Pope", "O. Frost", "I. Vance"];
+  let seq = 9000;
+  for (let d = -14; d <= 120; d++) {
+    if (d === 0) continue;
+    const dow = dateForOffset(d).getDay();
+    const weekend = dow === 0 || dow === 6;
+    const count = weekend ? 9 : 2;
+    for (let i = 0; i < count; i++) {
+      const boat = rentable[idx(d * 7 + i * 3, rentable.length)];
+      const full = (d + i) % 2 === 0;
+      const starts = full ? FULL_STARTS : HALF_STARTS;
+      reservations.push({
+        id: `G-${seq++}`,
+        boatId: boat.id,
+        category: boat.category,
+        start: starts[idx(d * 3 + i * 5, starts.length)],
+        duration: full ? FULL_MIN : HALF_MIN,
+        renter: names[idx(d * 2 + i, names.length)],
+        d,
+      });
+    }
+  }
+})();

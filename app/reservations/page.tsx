@@ -4,7 +4,13 @@ import { useState } from "react";
 import { statusConfig, boats as fleetBoats, type Boat, type BoatStatus } from "../fleet/data";
 import {
   Reservation,
-  reservationsForBoat,
+  reservationsForBoatInRange,
+  todaysReservations,
+  dayOf,
+  boardStage,
+  dayMeta,
+  dateForOffset,
+  dayLabel,
   rentalFleetByCategory,
   boatOpenWindows,
   typicalWindows,
@@ -13,12 +19,10 @@ import {
   fmt,
   fmtRange,
   pctLeft,
-  pctWidth,
   DAY_START,
   DAY_END,
   NOW_MIN,
   resEnd,
-  reservations,
   DEMO_DATE,
   DEMO_DATE_SHORT,
   HALF_MIN,
@@ -87,6 +91,29 @@ const SEED_INCIDENTS: Incident[] = [
   },
 ];
 
+const RANGES: { key: string; label: string; days: number }[] = [
+  { key: "day", label: "Day", days: 1 },
+  { key: "week", label: "Week", days: 7 },
+  { key: "2wk", label: "2 Wk", days: 14 },
+  { key: "month", label: "Month", days: 30 },
+  { key: "6mo", label: "6 Mo", days: 182 },
+  { key: "year", label: "Year", days: 365 },
+];
+function axisTicks(winStart: number, rangeDays: number): { pos: number; label: string }[] {
+  if (rangeDays === 1) return HOUR_LABELS.map((min) => ({ pos: pctLeft(min), label: fmt(min) }));
+  const out: { pos: number; label: string }[] = [];
+  if (rangeDays <= 14) {
+    for (let i = 0; i < rangeDays; i++) { const m = dayMeta(winStart + i); out.push({ pos: (i / rangeDays) * 100, label: `${m.weekday} ${m.day}` }); }
+  } else if (rangeDays <= 31) {
+    const step = Math.max(1, Math.ceil(rangeDays / 12));
+    for (let i = 0; i < rangeDays; i += step) { const m = dayMeta(winStart + i); out.push({ pos: (i / rangeDays) * 100, label: `${m.month} ${m.day}` }); }
+  } else {
+    let last = -1;
+    for (let i = 0; i < rangeDays; i++) { const m = dayMeta(winStart + i); if (m.monthIdx !== last) { last = m.monthIdx; out.push({ pos: (i / rangeDays) * 100, label: m.month }); } }
+  }
+  return out;
+}
+
 export default function ReservationsPage() {
   const [cardOpen, setCardOpen] = useState(false);
   const [slot, setSlot] = useState<Slot | null>(null);
@@ -99,6 +126,8 @@ export default function ReservationsPage() {
   const [noteText, setNoteText] = useState("");
   const [noteWho, setNoteWho] = useState(EMPLOYEES[0]);
   const [dispatchStatus, setDispatchStatus] = useState<Record<string, number>>({});
+  const [view, setView] = useState("day");
+  const [winStart, setWinStart] = useState(0);
 
   const addNote = () => {
     const t = noteText.trim();
@@ -114,7 +143,13 @@ export default function ReservationsPage() {
   const live = liveCounts();
   const turnovers = turnoverBoatIds();
 
-  const nowLeft = `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${pctLeft(NOW_MIN) / 100})`;
+  const rangeDays = RANGES.find((r) => r.key === view)!.days;
+  const wm = dayMeta(winStart);
+  const wmEnd = dayMeta(winStart + rangeDays - 1);
+  const yr = dateForOffset(winStart).getFullYear();
+  const rangeLabel = rangeDays === 1
+    ? `${wm.weekday}, ${wm.month} ${wm.day}, ${yr}`
+    : `${wm.month} ${wm.day} – ${wmEnd.month} ${wmEnd.day}, ${yr}`;
 
   return (
     <div className="px-8 py-6 max-w-[1800px] mx-auto w-full">
@@ -184,12 +219,29 @@ export default function ReservationsPage() {
         <DispatchPanel status={dispatchStatus} onCycle={cycleDispatch} />
       </div>
 
+      {/* Grid time-range toggle + date nav */}
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+        <div className="inline-flex rounded-full border border-black/10 bg-white overflow-hidden">
+          {RANGES.map((r) => (
+            <button key={r.key} onClick={() => { setView(r.key); setWinStart(0); }} className="px-3.5 py-1.5 text-[13px] font-medium border-r border-black/10 last:border-r-0 transition-colors" style={{ background: view === r.key ? NAVY : "transparent", color: view === r.key ? "#fff" : "#4b4b4b" }}>{r.label}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setWinStart((w) => w - rangeDays)} className="w-8 h-8 rounded-full border border-black/10 bg-white text-[#4b4b4b] hover:bg-[#fafafa] leading-none" aria-label="previous">‹</button>
+          <button onClick={() => setWinStart(0)} className="px-3 py-1.5 rounded-full border border-black/10 bg-white text-[13px] font-medium text-black hover:bg-[#fafafa]">Today</button>
+          <button onClick={() => setWinStart((w) => w + rangeDays)} className="w-8 h-8 rounded-full border border-black/10 bg-white text-[#4b4b4b] hover:bg-[#fafafa] leading-none" aria-label="next">›</button>
+          <span className="text-[13px] font-semibold text-black ml-1 tabular-nums">{rangeLabel}</span>
+        </div>
+      </div>
+
       {/* Board */}
       <Board
+        view={view}
+        winStart={winStart}
+        rangeDays={rangeDays}
         turnovers={turnovers}
         onOpenSlot={setSlot}
         onBlockClick={setDetail}
-        nowLeft={nowLeft}
         slot={slot}
         onCloseSlot={() => setSlot(null)}
         onPickWindow={(boat, start, duration) => { setSlot(null); setBooking({ category: boat.category, boatId: boat.id, start, duration }); }}
@@ -203,7 +255,7 @@ export default function ReservationsPage() {
             {stageConfig[k].label}
           </span>
         ))}
-        <span className="text-[11px] text-[#afafaf] ml-auto">Click an open lane for start times · click a booking to view it · {reservations.length} bookings today</span>
+        <span className="text-[11px] text-[#afafaf] ml-auto">Click an open lane for start times · click a booking to view it · {todaysReservations().length} bookings today</span>
       </div>
 
       {detail && <ReservationDetail res={detail} onClose={() => setDetail(null)} />}
@@ -242,26 +294,24 @@ function SlotSection({ title, wins }: { title: string; wins: { start: number; en
 }
 
 function Board({
-  turnovers,
-  onOpenSlot,
-  onBlockClick,
-  nowLeft,
-  slot,
-  onCloseSlot,
-  onPickWindow,
+  view, winStart, rangeDays,
+  turnovers, onOpenSlot, onBlockClick, slot, onCloseSlot, onPickWindow,
 }: {
+  view: string; winStart: number; rangeDays: number;
   turnovers: Set<string>;
   onOpenSlot: (s: Slot) => void;
   onBlockClick: (r: Reservation) => void;
-  nowLeft: string;
   slot: Slot | null;
   onCloseSlot: () => void;
   onPickWindow: (boat: Boat, start: number, duration: number) => void;
 }) {
+  void view;
   const [boardEl, setBoardEl] = useState<HTMLDivElement | null>(null);
+  const bookable = rangeDays === 1 && winStart === 0; // booking is for today only
+  const ticks = axisTicks(winStart, rangeDays);
 
   function laneClick(e: React.MouseEvent<HTMLDivElement>, boat: Boat) {
-    if (boat.status !== "in-service" || !boardEl) return;
+    if (!bookable || boat.status !== "in-service" || !boardEl) return;
     const boardRect = boardEl.getBoundingClientRect();
     const rowRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const rawLeft = e.clientX - boardRect.left;
@@ -270,95 +320,102 @@ function Board({
     onOpenSlot({ boat, top: rowRect.bottom - boardRect.top, left });
   }
 
+  const todayInWindow = winStart <= 0 && 0 < winStart + rangeDays;
+  const nowPos = rangeDays === 1
+    ? pctLeft(NOW_MIN)
+    : (((0 - winStart) + (NOW_MIN - DAY_START) / (DAY_END - DAY_START)) / rangeDays) * 100;
+  const nowLeftCss = `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${nowPos / 100})`;
+
   return (
     <div ref={setBoardEl} className="relative bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] overflow-hidden">
-      {/* Time axis */}
       <div className="flex bg-[#fafafa] border-b border-black/5">
         <div style={{ width: LABEL_W }} className="flex-shrink-0 px-3 py-2">
           <span className="text-[10px] font-semibold text-[#afafaf] uppercase tracking-widest">Boat</span>
         </div>
         <div className="relative flex-1 h-8">
-          {HOUR_LABELS.map((min) => (
-            <span key={min} className="absolute -translate-x-1/2 top-2 text-[10px] text-[#afafaf] tabular-nums" style={{ left: `${pctLeft(min)}%` }}>
-              {fmt(min)}
-            </span>
+          {ticks.map((t, i) => (
+            <span key={i} className="absolute -translate-x-1/2 top-2 text-[10px] text-[#afafaf] tabular-nums whitespace-nowrap" style={{ left: `${t.pos}%` }}>{t.label}</span>
           ))}
         </div>
       </div>
 
-      {/* Category groups */}
       {groups.map((g) => (
         <div key={g.category}>
           <div className="px-3 py-1.5 bg-[#fafafa] border-b border-black/5">
             <span className="text-[11px] font-semibold text-[#4b4b4b]">{g.category}</span>
           </div>
           {g.boats.map((b) => (
-            <BoatRow key={b.id} boat={b} isTurnover={turnovers.has(b.id)} onLaneClick={(e) => laneClick(e, b)} onBlockClick={onBlockClick} />
+            <BoatRow key={b.id} boat={b} winStart={winStart} rangeDays={rangeDays} ticks={ticks} bookable={bookable} isTurnover={turnovers.has(b.id)} onLaneClick={(e) => laneClick(e, b)} onBlockClick={onBlockClick} />
           ))}
         </div>
       ))}
 
-      {/* Now line */}
-      <div className="absolute pointer-events-none z-10" style={{ left: nowLeft, top: 32, bottom: 0, width: 2, background: "#D85A30" }}>
-        <span className="absolute -top-0.5 -left-3.5 text-[9px] font-semibold text-[#D85A30] bg-white px-1">now</span>
-      </div>
+      {todayInWindow && (
+        <div className="absolute pointer-events-none z-10" style={{ left: nowLeftCss, top: 32, bottom: 0, width: 2, background: "#D85A30" }}>
+          <span className="absolute -top-0.5 -left-3.5 text-[9px] font-semibold text-[#D85A30] bg-white px-1">{rangeDays === 1 ? "now" : "today"}</span>
+        </div>
+      )}
 
-      {slot && <SlotPeek boat={slot.boat} top={slot.top} left={slot.left} onClose={onCloseSlot} onPick={onPickWindow} />}
+      {slot && bookable && <SlotPeek boat={slot.boat} top={slot.top} left={slot.left} onClose={onCloseSlot} onPick={onPickWindow} />}
     </div>
   );
 }
 
 function BoatRow({
-  boat,
-  isTurnover,
-  onLaneClick,
-  onBlockClick,
+  boat, winStart, rangeDays, ticks, bookable, isTurnover, onLaneClick, onBlockClick,
 }: {
-  boat: Boat;
-  isTurnover: boolean;
+  boat: Boat; winStart: number; rangeDays: number; ticks: { pos: number; label: string }[];
+  bookable: boolean; isTurnover: boolean;
   onLaneClick: (e: React.MouseEvent<HTMLDivElement>) => void;
   onBlockClick: (r: Reservation) => void;
 }) {
-  const res = reservationsForBoat(boat.id);
+  const res = reservationsForBoatInRange(boat.id, winStart, winStart + rangeDays);
   const inService = boat.status === "in-service";
   const sc = statusConfig[boat.status as BoatStatus];
-
-  const g = (60 / (DAY_END - DAY_START)) * 100;
-  const hourGrid =
-    `repeating-linear-gradient(to right, transparent 0, transparent calc(${g}% - 1px), rgba(0,0,0,0.05) calc(${g}% - 1px), rgba(0,0,0,0.05) ${g}%)`;
+  const showText = rangeDays === 1;
+  const oosBar = !inService && rangeDays === 1;
+  const laneClickable = bookable && inService;
 
   return (
     <div className="flex items-stretch border-b border-black/5">
       <div style={{ width: LABEL_W, opacity: inService ? 1 : 0.5 }} className="flex-shrink-0 px-3 py-2 border-r border-black/5 flex flex-col justify-center">
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-semibold text-black leading-tight truncate">{boat.name}</span>
-          {isTurnover && <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded-full flex-shrink-0">turn</span>}
+          {isTurnover && rangeDays === 1 && <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded-full flex-shrink-0">turn</span>}
         </div>
         {boat.code && <span className="text-[10px] font-mono text-[#5C9A9E] font-semibold">{boat.code}</span>}
       </div>
 
       <div
         className="relative flex-1 min-h-[46px]"
-        style={{ backgroundImage: hourGrid, cursor: inService ? "pointer" : "default" }}
-        onClick={inService ? onLaneClick : undefined}
+        style={{ cursor: laneClickable ? "pointer" : "default" }}
+        onClick={laneClickable ? onLaneClick : undefined}
       >
-        {!inService ? (
+        {ticks.map((t, i) => (
+          <div key={i} className="absolute top-0 bottom-0 w-px pointer-events-none" style={{ left: `${t.pos}%`, background: "rgba(0,0,0,0.05)" }} />
+        ))}
+        {oosBar ? (
           <div className="absolute inset-1.5 rounded-md flex items-center px-3 text-[12px]" style={{ background: GRAY.bg, border: `1px solid ${GRAY.border}`, color: GRAY.text }}>
             {sc.label}
             {boat.maintenanceNote ? ` · ${boat.maintenanceNote.split(".")[0]}` : ""}
           </div>
         ) : (
           res.map((r) => {
-            const st = stageConfig[stageOf(r)];
+            const st = stageConfig[boardStage(r)];
+            const dayPos = dayOf(r) - winStart;
+            const iStart = (r.start - DAY_START) / (DAY_END - DAY_START);
+            const iDur = r.duration / (DAY_END - DAY_START);
+            const left = ((dayPos + iStart) / rangeDays) * 100;
+            const width = Math.max((iDur / rangeDays) * 100, 0.4);
             return (
               <div
                 key={r.id}
                 onClick={(e) => { e.stopPropagation(); onBlockClick(r); }}
-                className="absolute top-[7px] bottom-[7px] rounded-md flex items-center px-2 text-[12px] overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-95"
-                style={{ left: `${pctLeft(r.start)}%`, width: `${pctWidth(r.duration)}%`, background: st.bg, border: `1px solid ${st.border}`, color: st.text }}
-                title={`${r.renter} · ${fmtRange(r.start, resEnd(r))} · ${st.label}`}
+                className="absolute top-[7px] bottom-[7px] rounded-[3px] flex items-center px-2 text-[12px] overflow-hidden whitespace-nowrap cursor-pointer hover:brightness-95"
+                style={{ left: `${left}%`, width: `${width}%`, background: st.bg, border: `1px solid ${st.border}`, color: st.text }}
+                title={`${r.renter} · ${dayLabel(dayOf(r))} ${fmtRange(r.start, resEnd(r))} · ${st.label}`}
               >
-                <span className="truncate tabular-nums">{r.renter} · {fmtRange(r.start, resEnd(r))}</span>
+                {showText && <span className="truncate tabular-nums">{r.renter} · {fmtRange(r.start, resEnd(r))}</span>}
               </div>
             );
           })
@@ -884,7 +941,7 @@ function NotesPanel({ incidents, setIncidents, notes, onToggle, onDelete, onAdd,
 }
 
 function DispatchPanel({ status, onCycle }: { status: Record<string, number>; onCycle: (id: string) => void }) {
-  const rows = [...reservations].sort((a, b) => a.start - b.start);
+  const rows = todaysReservations().sort((a, b) => a.start - b.start);
   return (
     <div className="bg-white rounded-xl shadow-[rgba(0,0,0,0.08)_0px_4px_16px] flex flex-col h-[560px]">
       <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
