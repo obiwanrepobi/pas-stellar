@@ -1,0 +1,27 @@
+# One player per line. Delete a line to drop somebody, add a line to add
+# somebody, then re-run:  python3 generate.py
+# Lines starting with # are ignored. An odd number of players is fine --
+# the leftover gets flagged on the sheet as first alternate.
+
+Nate
+Brady
+Brenna
+Josh
+Jamys
+Shannon
+Kevin
+Haley
+Ritter
+Mcbobs
+Shawn
+Jake
+Logan
+Corey
+Gio
+Kyle
+Morgan
+Dileo
+Cassie
+Adam
+Kenny
+Tommy
