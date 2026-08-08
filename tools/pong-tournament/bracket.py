@@ -28,29 +28,32 @@ class Team:
 
     @property
     def name(self) -> str:
-        return " & ".join(self.players)
+        if len(self.players) < 3:
+            return " & ".join(self.players)
+        return ", ".join(self.players[:-1]) + " & " + self.players[-1]
 
     @property
     def label(self) -> str:
         return f"T{self.seed}"
 
 
-def make_teams(roster: list[str], rng: random.Random) -> tuple[list[Team], list[str]]:
-    """Shuffle the roster into pairs. Returns (teams, leftover players).
+def make_teams(
+    roster: list[str], rng: random.Random, size: int = 2
+) -> tuple[list[Team], list[str]]:
+    """Shuffle the roster into teams of `size`. Returns (teams, leftovers).
 
-    An odd roster leaves one player over; that player is reported back so the
-    caller can decide what to do (play as a solo team, sit out, or sub in).
+    A roster that does not divide evenly leaves players over; they are reported
+    back so the caller can decide what to do (sit out, sub in, or pad a team).
     """
     pool = list(roster)
     rng.shuffle(pool)
 
-    leftover: list[str] = []
-    if len(pool) % 2 == 1:
-        leftover = [pool.pop()]
+    remainder = len(pool) % size
+    leftover = [pool.pop() for _ in range(remainder)] if remainder else []
 
-    pairs = [pool[i : i + 2] for i in range(0, len(pool), 2)]
-    rng.shuffle(pairs)
-    teams = [Team(seed=i + 1, players=p) for i, p in enumerate(pairs)]
+    groups = [pool[i : i + size] for i in range(0, len(pool), size)]
+    rng.shuffle(groups)
+    teams = [Team(seed=i + 1, players=g) for i, g in enumerate(groups)]
     return teams, leftover
 
 

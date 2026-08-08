@@ -13,8 +13,9 @@ python3 generate.py
 ```
 
 That writes `pong-bracket.pdf` and `pong-bracket.html` in this folder. Any
-number of players works — odd rosters leave one person as first alternate, and
-odd team counts get first-round byes automatically.
+number of players works — players left over after the teams are formed become
+alternates, and team counts that are not a power of two get first-round byes
+automatically.
 
 Useful flags:
 
@@ -24,6 +25,15 @@ Useful flags:
 | `--title "Fall Cup"` | rename the tournament |
 | `--roster other.txt` | use a different roster file |
 | `--out /path/name` | write somewhere else |
+| `--team-size 3` | players per team (default 2) |
+
+## Byes, and how to avoid them
+
+A bracket only starts symmetrical when the team count is a power of two. Any
+other count parks the extra teams in first-round byes — that is not a flaw in
+the draw, it is arithmetic. If you want zero byes, change the team size so the
+team count lands on 4, 8, or 16. With 24 players, `--team-size 3` gives exactly
+8 teams and a perfectly clean bracket.
 
 ## What comes out
 

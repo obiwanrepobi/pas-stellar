@@ -132,7 +132,8 @@ def tree(bk: Bracket) -> str:
 
 
 def build_html(
-    bk: Bracket, teams: list[Team], leftover: list[str], title: str, draw_seed: int
+    bk: Bracket, teams: list[Team], leftover: list[str], title: str,
+    draw_seed: int, team_size: int = 2
 ) -> str:
     team_cards = "".join(
         f'<div class="team"><span class="tno">{t.seed}</span>'
@@ -311,7 +312,8 @@ def build_html(
 <body>
 
 <section class="page">
-  <h1><small>Double Elimination · {len(teams)} Teams · {bk.total_games()} Games</small>
+  <h1><small>Double Elimination · {len(teams)} Teams of {team_size} ·
+  {bk.total_games()} Games</small>
   {esc(title)}</h1>
   <p class="lede">Teams and matchups were drawn at random (draw #{draw_seed}).
   Two losses and you are out — so every team is guaranteed at least two games.</p>
@@ -342,8 +344,8 @@ def build_html(
   same time if you have two tables.</p>
   <div class="order">{order_chips}</div>
 
-  <div class="callout"><b>Somebody drops out?</b> Two options. Easiest: their
-  partner grabs the first alternate or plays solo — the bracket does not change.
+  <div class="callout"><b>Somebody drops out?</b> Two options. Easiest: the rest
+  of their team grabs a sub or plays a man down — the bracket does not change.
   Cleaner: re-run the draw with the new roster and print a fresh sheet. If a
   team leaves before their game, their opponent advances by forfeit; write
   "FF" in the score box.</div>
@@ -430,24 +432,27 @@ def main() -> int:
     ap.add_argument("--roster", default=str(HERE / "roster.txt"))
     ap.add_argument("--seed", type=int, default=None, help="reproducible draw")
     ap.add_argument("--title", default="Pong Tournament")
+    ap.add_argument("--team-size", type=int, default=2, help="players per team")
     ap.add_argument("--out", default=str(HERE / "pong-bracket"))
     args = ap.parse_args()
 
     roster = read_roster(Path(args.roster))
-    if len(roster) < 4:
-        print("need at least 4 players", file=sys.stderr)
+    if len(roster) < 2 * args.team_size:
+        print("need at least two full teams", file=sys.stderr)
         return 1
 
     draw_seed = args.seed if args.seed is not None else random.SystemRandom().randrange(1000, 9999)
     rng = random.Random(draw_seed)
 
-    teams, leftover = make_teams(roster, rng)
+    teams, leftover = make_teams(roster, rng, args.team_size)
     bk = Bracket(teams)
 
-    out = Path(args.out)
+    out = Path(args.out).resolve()
     html_path = out.with_suffix(".html")
     pdf_path = out.with_suffix(".pdf")
-    html_path.write_text(build_html(bk, teams, leftover, args.title, draw_seed))
+    html_path.write_text(
+        build_html(bk, teams, leftover, args.title, draw_seed, args.team_size)
+    )
 
     chrome = find_chromium()
     if chrome:
@@ -466,7 +471,8 @@ def main() -> int:
         print(f"no chromium found — open {html_path} and print to PDF", file=sys.stderr)
 
     print(
-        f"{len(roster)} players · {len(teams)} teams · {bk.total_games()} games · draw #{draw_seed}"
+        f"{len(roster)} players · {len(teams)} teams of {args.team_size} · "
+        f"{bk.total_games()} games · draw #{draw_seed}"
         + (f" · alternate: {', '.join(leftover)}" if leftover else "")
     )
     return 0
