@@ -35,6 +35,24 @@ the draw, it is arithmetic. If you want zero byes, change the team size so the
 team count lands on 4, 8, or 16. With 24 players, `--team-size 3` gives exactly
 8 teams and a perfectly clean bracket.
 
+## Recording results as you go
+
+Each sheet has a results file beside it — `pong-bracket-results.txt` for the
+default one. Add a line per finished game and re-run `generate.py`:
+
+```
+W3: 7          game W3 was won by team 7
+W7: 7 21-15    ...with the score, if you kept it
+```
+
+The reprinted PDF ticks the winner, strikes out the loser, fills their score
+boxes, and — the useful part — replaces every downstream "Winner of W3" with
+the actual team name, all the way through both brackets and the tree. Entries
+that do not fit the bracket (wrong game, a team that is not in it, a game whose
+feeders are still open) are reported and skipped rather than silently applied.
+
+Override the file with `--results path.txt`.
+
 ## What comes out
 
 1. **Cover** — the draw, the rules, and a tick-off running order for every game.

@@ -1,0 +1,3 @@
+# Finished games. Format:  GAME: winning-team-number [score]
+# e.g.  W2: 4 21-15
+W2: 4

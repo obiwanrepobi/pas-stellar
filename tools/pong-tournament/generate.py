@@ -45,6 +45,32 @@ def read_roster(path: Path) -> list[str]:
     return names
 
 
+def read_results(path: Path) -> dict[str, tuple[int, str]]:
+    """Parse a results file.
+
+        W3: 7 21-15     game W3 was won by team 7, final score 21-15
+        L1: 4           game L1 was won by team 4, score not recorded
+
+    Missing file means nothing has been played yet.
+    """
+    results: dict[str, tuple[int, str]] = {}
+    if not path.exists():
+        return results
+    for lineno, raw in enumerate(path.read_text().splitlines(), 1):
+        line = raw.split("#")[0].strip()
+        if not line:
+            continue
+        game, _, rest = line.partition(":")
+        parts = rest.split()
+        if not parts:
+            raise ValueError(f"{path}:{lineno}: expected 'GAME: winning-team [score]'")
+        seed = parts[0].lstrip("tT#")
+        if not seed.isdigit():
+            raise ValueError(f"{path}:{lineno}: '{parts[0]}' is not a team number")
+        results[game.strip().upper()] = (int(seed), " ".join(parts[1:]))
+    return results
+
+
 def find_chromium() -> str | None:
     for cand in (
         "/opt/pw-browsers/chromium/chrome-linux/chrome",
@@ -67,15 +93,32 @@ def find_chromium() -> str | None:
 
 
 def card(bk: Bracket, m: Match, tone: str) -> str:
+    won, _, score = bk.outcome(m)
+    high, low = "", ""
+    if score:
+        bits = score.replace("–", "-").split("-")
+        if len(bits) == 2 and all(b.strip().isdigit() for b in bits):
+            high, low = (b.strip() for b in bits)
+        else:
+            high = score
+
     def side(slot: Slot) -> str:
-        text = bk.slot_text(slot)
-        known = slot.team is not None
-        cls = "who known" if known else "who pending"
+        team = bk.resolve(slot)
+        cls = "who known" if team is not None else "who pending"
+        state, box = "", ""
+        if team is not None and won is not None:
+            if team.seed == won.seed:
+                state, box = " won", high
+            else:
+                state, box = " lost", low
         return (
-            f'<div class="side"><span class="tick"></span>'
-            f'<span class="{cls}">{esc(text)}</span>'
-            f'<span class="dots"></span><span class="score"></span></div>'
+            f'<div class="side{state}"><span class="tick"></span>'
+            f'<span class="{cls}">{esc(bk.slot_text(slot))}</span>'
+            f'<span class="dots"></span><span class="score">{esc(box)}</span></div>'
         )
+
+    if won is not None:
+        tone += " done"
 
     routes = []
     routes.append(
@@ -96,11 +139,16 @@ def card(bk: Bracket, m: Match, tone: str) -> str:
 
 def tree(bk: Bracket) -> str:
     """Fill-in winners-bracket tree. Byes are pre-printed, the rest is blank."""
-    def slot_html(slot: Slot) -> str:
-        if slot.team is not None:
+    def slot_html(slot: Slot, m: Match) -> str:
+        team = bk.resolve(slot)
+        if team is not None:
+            won, _, _score = bk.outcome(m)
+            state = ""
+            if won is not None:
+                state = " won" if team.seed == won.seed else " lost"
             return (
-                f'<div class="tslot"><span class="tline"><i>{esc(slot.team.label)}</i>'
-                f'{esc(slot.team.name)}</span></div>'
+                f'<div class="tslot"><span class="tline{state}">'
+                f'<i>{esc(team.label)}</i>{esc(team.name)}</span></div>'
             )
         if slot.is_bye():
             return '<div class="tslot"><span class="tline bye">bye</span></div>'
@@ -115,16 +163,18 @@ def tree(bk: Bracket) -> str:
         rows = []
         for m in bk._round("W", r):
             tag = f'<span class="tnum">{esc(m.display)}</span>' if m.live else ""
-            slots = "".join(slot_html(s) for s in (m.a, m.b))
+            slots = "".join(slot_html(s, m) for s in (m.a, m.b))
             cls = "tmatch playing" if m.live else "tmatch"
             rows.append(f'<div class="{cls}">{tag}{slots}</div>')
         label = "Winners final" if r == bk.wb_rounds else f"Round {r}"
         cols.append(f'<div class="tcol"><h4>{label}</h4>{"".join(rows)}</div>')
 
     gf = bk.matches["GF"]
+    champ = bk.resolve(gf.a)
+    undefeated = f"{champ.label} · {champ.name}" if champ else ""
     cols.append(
         '<div class="tcol last"><h4>Undefeated</h4><div class="tmatch">'
-        '<div class="tslot"><span class="tline blank crown"></span>'
+        f'<div class="tslot"><span class="tline blank crown">{esc(undefeated)}</span>'
         f'<em>from {esc(gf.a.source[0] and bk.matches[gf.a.source[0]].display)} '
         "&rarr; grand final</em></div></div></div>"
     )
@@ -170,13 +220,19 @@ def build_html(
         )
 
     gf = bk.matches["GF"]
+    champ = bk.champion()
+    champion_line = esc(champ.name) if champ else ""
 
     order_chips = "".join(
-        f'<span class="chip {"w" if m.bracket == "W" else "l"}">'
+        f'<span class="chip {"w" if m.bracket == "W" else "l"}'
+        f'{" done" if bk.outcome(m)[0] else ""}">'
         f'<span class="tick"></span>{esc(m.display)}</span>'
         for m in bk.play_order()
         if m.bracket != "GF"
-    ) + '<span class="chip gf"><span class="tick"></span>GF</span>'
+    ) + (
+        f'<span class="chip gf{" done" if champ else ""}">'
+        '<span class="tick"></span>GF</span>'
+    )
 
     leftover_block = (
         f'<p class="alt"><b>First alternate:</b> {esc(", ".join(leftover))} — '
@@ -258,7 +314,17 @@ def build_html(
   .who.known {{ font-weight: 600; }}
   .who.pending {{ color: #8b8177; font-style: italic; }}
   .dots {{ flex: 1; border-bottom: 1px dotted #cdc5ba; height: 8px; min-width: 6px; }}
-  .score {{ width: 26px; border-bottom: 1px solid #16130f; height: 13px; flex: none; }}
+  .score {{ width: 26px; border-bottom: 1px solid #16130f; height: 13px; flex: none;
+    font-size: 8.5pt; font-weight: 700; text-align: center; line-height: 12px; }}
+  .game.done {{ background: #fbf9f6; }}
+  .side.won .tick {{ background: #16130f; border-color: #16130f; position: relative; }}
+  .side.won .tick::after {{ content: "✓"; position: absolute; inset: 0; color: #fff;
+    font-size: 8pt; line-height: 10px; text-align: center; }}
+  .side.won .who {{ font-weight: 700; }}
+  .side.lost .who {{ color: #a89e93; text-decoration: line-through; }}
+  .side.lost .score {{ color: #a89e93; }}
+  .chip.done {{ background: #f1ede7; color: #a89e93; border-color: #e3ddd4; }}
+  .chip.done .tick {{ background: #a89e93; border-color: #a89e93; }}
   .route {{ font-size: 7pt; letter-spacing: .07em; text-transform: uppercase;
     color: #8b8177; margin-top: 3px; }}
   .route b {{ color: #16130f; }}
@@ -286,6 +352,8 @@ def build_html(
     letter-spacing: .09em; text-transform: uppercase; color: #b3a89c;
     padding-top: 1px; }}
   .tline.bye {{ color: #c2b9ae; font-style: italic; border-bottom-color: #e6e0d7; }}
+  .tline.won {{ font-weight: 700; }}
+  .tline.lost {{ color: #b3a89c; text-decoration: line-through; }}
   .tline.crown {{ border-bottom-width: 2px; }}
 
   /* finale */
@@ -299,7 +367,8 @@ def build_html(
     padding: 11px 16px 6px; }}
   .champ .lbl {{ font-size: 8pt; letter-spacing: .22em; text-transform: uppercase;
     color: #a8341f; font-weight: 700; }}
-  .champ .line {{ border-bottom: 2px solid #16130f; height: 34px; margin-top: 4px; }}
+  .champ .line {{ border-bottom: 2px solid #16130f; height: 34px; margin-top: 4px;
+    font-size: 17pt; font-weight: 700; line-height: 32px; }}
   .notes .rule {{ border-bottom: 1px solid #ded7cd; height: 26px; }}
   .standings div {{ display: flex; align-items: baseline; gap: 10px;
     padding: 7px 0 3px; }}
@@ -403,7 +472,7 @@ def build_html(
 
   <div class="champ">
     <div class="lbl">Champions</div>
-    <div class="line"></div>
+    <div class="line">{champion_line}</div>
   </div>
 
   <h2>Final Standings</h2>
@@ -433,6 +502,8 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=None, help="reproducible draw")
     ap.add_argument("--title", default="Pong Tournament")
     ap.add_argument("--team-size", type=int, default=2, help="players per team")
+    ap.add_argument("--results", default=None,
+                    help="file of finished games (default: results.txt beside --out)")
     ap.add_argument("--out", default=str(HERE / "pong-bracket"))
     args = ap.parse_args()
 
@@ -448,6 +519,11 @@ def main() -> int:
     bk = Bracket(teams)
 
     out = Path(args.out).resolve()
+    results_path = Path(args.results) if args.results else out.with_name(
+        out.name + "-results.txt"
+    )
+    for complaint in bk.apply_results(read_results(results_path)):
+        print(f"skipped — {complaint}", file=sys.stderr)
     html_path = out.with_suffix(".html")
     pdf_path = out.with_suffix(".pdf")
     html_path.write_text(
@@ -470,9 +546,12 @@ def main() -> int:
     else:
         print(f"no chromium found — open {html_path} and print to PDF", file=sys.stderr)
 
+    played = sum(1 for m in bk.play_order() if bk.outcome(m)[0])
+    champ = bk.champion()
     print(
         f"{len(roster)} players · {len(teams)} teams of {args.team_size} · "
-        f"{bk.total_games()} games · draw #{draw_seed}"
+        f"{played}/{bk.total_games()} games played · draw #{draw_seed}"
+        + (f" · CHAMPIONS: {champ.name}" if champ else "")
         + (f" · alternate: {', '.join(leftover)}" if leftover else "")
     )
     return 0

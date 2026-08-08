@@ -270,13 +270,76 @@ class Bracket:
                 out.append((r, live))
         return out
 
+    # -- recorded results ---------------------------------------------------
+
+    def apply_results(self, results: dict[str, tuple[int, str]]) -> list[str]:
+        """Record finished games so the sheet prints itself in.
+
+        `results` maps a display id ("W3") to (winning team seed, score text).
+        Returns a list of complaints about entries that do not fit the bracket;
+        anything valid is applied regardless, so one typo does not sink the run.
+        """
+        self._won = {}
+        self._lost = {}
+        self._score = {}
+        problems: list[str] = []
+
+        by_display = {m.display: m for m in self.matches.values() if m.live}
+        for disp in results:
+            if disp not in by_display:
+                problems.append(f"{disp}: no such game")
+
+        for m in self.play_order():
+            entry = results.get(m.display)
+            if entry is None:
+                continue
+            seed, score = entry
+            sides = [self.resolve(m.a), self.resolve(m.b)]
+            if any(s is None for s in sides):
+                problems.append(f"{m.display}: can't score it yet, an earlier game is open")
+                continue
+            match = [t for t in sides if t.seed == seed]
+            if not match:
+                got = " and ".join(f"T{t.seed}" for t in sides)
+                problems.append(f"{m.display}: T{seed} is not in that game ({got})")
+                continue
+            self._won[m.mid] = match[0]
+            self._lost[m.mid] = sides[1] if sides[0].seed == seed else sides[0]
+            self._score[m.mid] = score
+
+        return problems
+
+    def resolve(self, slot: Slot) -> Team | None:
+        """The actual team in a slot, following recorded results. None if TBD."""
+        if slot.team is not None:
+            return slot.team
+        if slot.source is None:
+            return None
+        mid, which = slot.source
+        table = getattr(self, "_won" if which == "W" else "_lost", {})
+        return table.get(mid)
+
+    def outcome(self, m: Match) -> tuple[Team | None, Team | None, str]:
+        """(winner, loser, score) for a match, or (None, None, "") if unplayed."""
+        won = getattr(self, "_won", {})
+        return (
+            won.get(m.mid),
+            getattr(self, "_lost", {}).get(m.mid),
+            getattr(self, "_score", {}).get(m.mid, ""),
+        )
+
+    def champion(self) -> Team | None:
+        gf = self.matches["GF"]
+        return getattr(self, "_won", {}).get(gf.mid)
+
     def play_order(self) -> list[Match]:
         """Every live match, in the order it becomes playable."""
         return [self.matches[mid] for mid in self._play_order() if self.matches[mid].live]
 
     def slot_text(self, slot: Slot) -> str:
-        if slot.team is not None:
-            return f"{slot.team.label} · {slot.team.name}"
+        team = self.resolve(slot)
+        if team is not None:
+            return f"{team.label} · {team.name}"
         if slot.source is not None:
             mid, which = slot.source
             other = self.matches[mid]
