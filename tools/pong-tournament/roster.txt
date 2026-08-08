@@ -25,3 +25,5 @@ Cassie
 Adam
 Kenny
 Tommy
+Connor
+Eva
